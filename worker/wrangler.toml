@@ -1,0 +1,20 @@
+name = "ids-meeting-bot"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+[[kv_namespaces]]
+binding  = "MEETINGS_KV"
+id       = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# Secrets (set via: wrangler secret put <NAME>)
+# ZOOM_ACCOUNT_ID
+# ZOOM_CLIENT_ID
+# ZOOM_CLIENT_SECRET
+# ZOOM_WEBHOOK_SECRET
+# TELEGRAM_BOT_TOKEN
+# TELEGRAM_CHAT_ID
+# GITHUB_TOKEN
+
+[vars]
+# Public vars (non-secret)
+ENVIRONMENT = "production"

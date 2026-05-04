@@ -1,0 +1,73 @@
+name: Meeting Pipeline
+
+on:
+  repository_dispatch:
+    types: [process_recording, list_tasks]
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      # ── process_recording: chạy pipeline sau khi meeting kết thúc ────────
+      - name: Run meeting pipeline
+        if: github.event.action == 'process_recording'
+        env:
+          MEETING_ID:            ${{ github.event.client_payload.meeting_id }}
+          MEETING_UUID:          ${{ github.event.client_payload.meeting_uuid }}
+          TOPIC:                 ${{ github.event.client_payload.topic }}
+          START_TIME:            ${{ github.event.client_payload.start_time }}
+          DURATION:              ${{ github.event.client_payload.duration }}
+          EMAILS_JSON:           ${{ toJson(github.event.client_payload.emails) }}
+          HOST_EMAIL:            ${{ github.event.client_payload.host_email }}
+          ZOOM_ACCOUNT_ID:       ${{ secrets.ZOOM_ACCOUNT_ID }}
+          ZOOM_CLIENT_ID:        ${{ secrets.ZOOM_CLIENT_ID }}
+          ZOOM_CLIENT_SECRET:    ${{ secrets.ZOOM_CLIENT_SECRET }}
+          GROQ_API_KEY:          ${{ secrets.GROQ_API_KEY }}
+          IDS_EMAIL:             ${{ secrets.IDS_EMAIL }}
+          IDS_EMAIL_PASSWORD:    ${{ secrets.IDS_EMAIL_PASSWORD }}
+          IDS_SMTP_HOST:         ${{ secrets.IDS_SMTP_HOST }}
+          TELEGRAM_BOT_TOKEN:    ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:      ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_GROUP_ID:     ${{ secrets.TELEGRAM_GROUP_ID }}
+          GOOGLE_TOKEN_JSON:     ${{ secrets.GOOGLE_TOKEN_JSON }}
+          SHEETS_ID:             ${{ secrets.SHEETS_ID }}
+        run: |
+          cd scripts
+          python pipeline.py
+
+      # ── list_tasks: trả về danh sách tasks cho lệnh /tasks ──────────────
+      - name: List pending tasks
+        if: github.event.action == 'list_tasks'
+        env:
+          CHAT_ID:            ${{ github.event.client_payload.chat_id }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+          GOOGLE_TOKEN_JSON:  ${{ secrets.GOOGLE_TOKEN_JSON }}
+          SHEETS_ID:          ${{ secrets.SHEETS_ID }}
+        run: |
+          cd scripts
+          python - <<'EOF'
+          import os, json
+          from sheets_manager import get_due_soon_tasks
+          from telegram_notify import notify_list_tasks
+
+          # Lấy tất cả tasks chưa done (không filter 48h)
+          tasks = get_due_soon_tasks(hours_ahead=9999)
+          chat_id = os.environ.get('CHAT_ID', os.environ.get('TELEGRAM_CHAT_ID'))
+          notify_list_tasks(tasks, chat_id)
+          print(f"Sent {len(tasks)} tasks to Telegram")
+          EOF

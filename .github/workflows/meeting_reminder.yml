@@ -1,0 +1,62 @@
+name: Meeting Reminder (30 min)
+
+on:
+  # Chạy mỗi 15 phút để check xem có meeting nào sắp diễn ra không
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Check upcoming meetings
+        env:
+          ZOOM_ACCOUNT_ID:     ${{ secrets.ZOOM_ACCOUNT_ID }}
+          ZOOM_CLIENT_ID:      ${{ secrets.ZOOM_CLIENT_ID }}
+          ZOOM_CLIENT_SECRET:  ${{ secrets.ZOOM_CLIENT_SECRET }}
+          TELEGRAM_BOT_TOKEN:  ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:    ${{ secrets.TELEGRAM_CHAT_ID }}
+          GOOGLE_TOKEN_JSON:   ${{ secrets.GOOGLE_TOKEN_JSON }}
+          SHEETS_ID:           ${{ secrets.SHEETS_ID }}
+        run: |
+          cd scripts
+          python - <<'EOF'
+          import os, json, requests
+          from datetime import datetime, timezone, timedelta
+          from zoom_api import get_access_token
+          from telegram_notify import notify_meeting_reminder
+
+          token = get_access_token()
+          r = requests.get(
+              'https://api.zoom.us/v2/users/me/meetings?type=upcoming&page_size=10',
+              headers={'Authorization': f'Bearer {token}'}, timeout=15
+          )
+          meetings = r.json().get('meetings', [])
+
+          now = datetime.now(timezone.utc)
+          window_start = now + timedelta(minutes=25)
+          window_end   = now + timedelta(minutes=35)
+
+          for m in meetings:
+              start = datetime.fromisoformat(m['start_time'].replace('Z', '+00:00'))
+              if window_start <= start <= window_end:
+                  start_vn = start.astimezone(timezone(timedelta(hours=7)))
+                  time_str = start_vn.strftime('%H:%M, %d/%m/%Y')
+                  notify_meeting_reminder(m['topic'], time_str, m['join_url'])
+                  print(f"Reminded: {m['topic']} at {time_str}")
+          EOF
