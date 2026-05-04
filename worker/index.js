@@ -311,7 +311,7 @@ async function triggerGitHubActions(eventType, payload) {
     {
       method : 'POST',
       headers: {
-        'Authorization': `Bearer ${GITHUB_TOKEN}`,
+        'Authorization': `Bearer ${GH_PAT}`,
         'Accept'       : 'application/vnd.github+json',
         'Content-Type' : 'application/json'
       },
