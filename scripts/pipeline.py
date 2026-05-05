@@ -21,13 +21,12 @@ from telegram_notify import notify_meeting_done, notify_owner
 
 
 WHISPER_PROMPT = (
-    "Cuộc họp nội bộ công ty IDS (IDS International). "
-    "Sản phẩm: Castrol, L'Oréal, LPD, LDB, CPD. "
+    "Cuộc họp nội bộ công ty IDS (IDS International), TP. Hồ Chí Minh. "
+    "Sản phẩm: Castrol, L'Oréal, LPD, LDB, CPD, L'Oréal Professionnel, Garnier, Maybelline. "
     "Đối thủ: Total, Motul, Mobil. "
-    "Tên người: Nguyên, Giang, Nam, Tuấn, Vi, Hùng, Linh, Thảo, Khoa. "
+    "Tên lãnh đạo: Nguyên, Bình, Giang, Lanh, Vy, Trí, Thức, Đạt, Khá, Vĩ. "
     "Thuật ngữ: doanh số, báo cáo, KPI, deadline, action item, "
-    "cashier, L'Oréal Professionnel, Garnier, Maybelline, "
-    "kế hoạch, phân phối, đại lý, garage, workshop."
+    "kế hoạch, phân phối, đại lý, garage, workshop, cashier, sell-in, sell-out."
 )
 
 
