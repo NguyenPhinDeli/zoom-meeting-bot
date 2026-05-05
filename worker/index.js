@@ -271,7 +271,8 @@ async function triggerGitHubActions(env, eventType, payload) {
       headers: {
         'Authorization': `Bearer ${env.GH_PAT}`,
         'Accept'       : 'application/vnd.github+json',
-        'Content-Type' : 'application/json'
+        'Content-Type' : 'application/json',
+        'User-Agent'   : 'IDS-Meeting-Bot/1.0'
       },
       body: JSON.stringify({ event_type: eventType, client_payload: payload })
     }
