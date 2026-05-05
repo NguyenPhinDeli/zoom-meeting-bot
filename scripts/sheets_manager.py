@@ -10,7 +10,8 @@ from googleapiclient.discovery import build
 TOKEN_FILE       = os.path.expanduser('~/Claude/token.json')
 SHEETS_ID_FILE   = os.path.expanduser('~/Claude/zoom-meeting-bot/sheets_id.txt')
 SCOPES           = ['https://www.googleapis.com/auth/drive',
-                    'https://www.googleapis.com/auth/spreadsheets']
+                    'https://www.googleapis.com/auth/gmail.readonly',
+                    'https://www.googleapis.com/auth/gmail.send']
 
 
 def _get_creds() -> Credentials:

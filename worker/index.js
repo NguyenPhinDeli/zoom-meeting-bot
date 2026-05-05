@@ -71,10 +71,14 @@ async function handleHelp(chatId) {
   const msg = `📖 <b>IDS Meeting Bot — Hướng dẫn</b>
 
 <b>Tạo meeting:</b>
+<code>/meeting "Tiêu đề" YYYY-MM-DD HH:MM phút IDS_Leaders</code>
+<i>IDS_Leaders = toàn bộ team trong danh sách</i>
+
+<b>Hoặc mời từng người:</b>
 <code>/meeting "Tiêu đề" YYYY-MM-DD HH:MM phút email1 email2</code>
 
 <b>Ví dụ:</b>
-<code>/meeting "Review Q2 Castrol" 2026-05-10 14:00 60 nam@ids-international.vn lan@ids-international.vn</code>
+<code>/meeting "Review Q2 Castrol" 2026-05-10 14:00 60 IDS_Leaders</code>
 
 <b>Xem danh sách meeting sắp tới:</b>
 <code>/meetings</code>
@@ -122,7 +126,18 @@ async function handleMeetingCommand(chatId, args) {
     const dateStr    = rest[0];            // YYYY-MM-DD
     const timeStr    = rest[1];            // HH:MM
     const duration   = parseInt(rest[2]);  // minutes
-    const emails     = rest.slice(3);      // email list
+    let   emails     = rest.slice(3);      // email list
+
+    // IDS_Leaders → lấy toàn bộ team từ Google Sheets qua GitHub Actions
+    if (emails.length === 1 && emails[0].toUpperCase() === 'IDS_LEADERS') {
+      await tgSend(chatId, '📋 Đang lấy danh sách team từ Google Sheets...');
+      emails = await getTeamEmails();
+      if (!emails.length) {
+        await tgSend(chatId, '❌ Không lấy được danh sách team. Kiểm tra Google Sheets tab Team.');
+        return ok();
+      }
+      await tgSend(chatId, `👥 Mời ${emails.length} thành viên: ${emails.join(', ')}`);
+    }
 
     const startTime  = `${dateStr}T${timeStr}:00`;
 
@@ -335,6 +350,20 @@ async function tgSend(chatId, text) {
       disable_web_page_preview : true
     })
   });
+}
+
+async function getTeamEmails() {
+  // Lấy từ CF KV (được sync hàng ngày từ Google Sheets bởi GitHub Actions)
+  try {
+    const cached = await MEETINGS_KV.get('team:emails');
+    if (cached) {
+      return JSON.parse(cached);
+    }
+    return [];
+  } catch (err) {
+    console.error('getTeamEmails error:', err);
+    return [];
+  }
 }
 
 async function computeHmac(secret, message) {
