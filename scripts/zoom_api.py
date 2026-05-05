@@ -31,10 +31,9 @@ def get_access_token() -> str:
     return _token_cache['token']
 
 
-def get_recordings(meeting_uuid: str, retries: int = 5, wait: int = 30) -> dict:
-    """Get recording files for a meeting. Retries while transcript is being processed."""
+def get_recordings(meeting_uuid: str, retries: int = 6, wait: int = 30) -> dict:
+    """Get recording files for a meeting. Retries while audio is being processed."""
     token = get_access_token()
-    # URL-encode double-encoded UUID
     encoded_uuid = requests.utils.quote(requests.utils.quote(meeting_uuid, safe=''), safe='')
 
     for attempt in range(retries):
@@ -51,12 +50,11 @@ def get_recordings(meeting_uuid: str, retries: int = 5, wait: int = 30) -> dict:
         r.raise_for_status()
         data = r.json()
 
-        # Check if transcript file exists
         files = data.get('recording_files', [])
-        has_transcript = any(f.get('file_type') == 'TRANSCRIPT' for f in files)
-
-        if not has_transcript and attempt < retries - 1:
-            print(f"  ⏳ Transcript not ready yet (attempt {attempt+1}/{retries}), waiting {wait}s...")
+        # Ưu tiên M4A (audio only) để dùng với Whisper
+        has_audio = any(f.get('file_type') in ('M4A', 'MP4') for f in files)
+        if not has_audio and attempt < retries - 1:
+            print(f"  ⏳ Audio not ready yet (attempt {attempt+1}/{retries}), waiting {wait}s...")
             time.sleep(wait)
             token = get_access_token()
             continue
@@ -66,37 +64,38 @@ def get_recordings(meeting_uuid: str, retries: int = 5, wait: int = 30) -> dict:
     return {}
 
 
-def download_transcript(download_url: str) -> str:
-    """Download and return VTT transcript content."""
+def download_audio_file(download_url: str, output_path: str) -> str:
+    """Download Zoom audio file (M4A/MP4) về local temp path."""
     token = get_access_token()
     r = requests.get(
         f"{download_url}?access_token={token}",
-        timeout=30
+        timeout=120,
+        stream=True
     )
     r.raise_for_status()
-    return r.text
+    with open(output_path, 'wb') as f:
+        for chunk in r.iter_content(chunk_size=8192):
+            f.write(chunk)
+    size_mb = os.path.getsize(output_path) / (1024 * 1024)
+    print(f"  ✓ Downloaded audio: {size_mb:.1f} MB → {output_path}")
+    return output_path
 
 
-def parse_vtt(vtt_content: str) -> str:
-    """Convert VTT transcript to clean plain text."""
-    lines = vtt_content.splitlines()
-    result = []
-    prev   = None
+def compress_audio_if_needed(input_path: str) -> str:
+    """Nén audio về ≤24MB bằng ffmpeg (nếu cần) để gửi Groq Whisper."""
+    import subprocess
+    size_mb = os.path.getsize(input_path) / (1024 * 1024)
+    if size_mb <= 24:
+        return input_path
 
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        if line.startswith('WEBVTT') or line.startswith('NOTE'):
-            continue
-        if '-->' in line:
-            continue
-        # Skip cue identifiers (pure numbers)
-        if line.isdigit():
-            continue
-        # Deduplicate consecutive identical lines (VTT overlap)
-        if line != prev:
-            result.append(line)
-            prev = line
-
-    return '\n'.join(result)
+    print(f"  ⚙️ File {size_mb:.1f}MB > 24MB, đang nén...")
+    output_path = input_path.rsplit('.', 1)[0] + '_compressed.mp3'
+    subprocess.run([
+        'ffmpeg', '-i', input_path,
+        '-ac', '1',       # mono
+        '-b:a', '32k',    # 32kbps → ~14MB/giờ
+        '-y', output_path
+    ], check=True, capture_output=True)
+    new_size = os.path.getsize(output_path) / (1024 * 1024)
+    print(f"  ✓ Nén xong: {new_size:.1f}MB")
+    return output_path

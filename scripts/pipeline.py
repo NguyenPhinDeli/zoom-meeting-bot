@@ -9,13 +9,29 @@ Input (env vars set bởi GH Actions):
 import os
 import sys
 import json
+import tempfile
 import traceback
 
-from zoom_api       import get_recordings, download_transcript, parse_vtt, get_access_token
+from groq           import Groq
+from zoom_api       import get_recordings, download_audio_file, compress_audio_if_needed
 from analyze        import analyze_meeting
 from email_sender   import send_all_minutes
 from sheets_manager import get_participants_for_meeting, log_meeting, log_action_items
 from telegram_notify import notify_meeting_done, notify_owner
+
+
+def transcribe_with_whisper(audio_path: str) -> str:
+    """Dùng Groq Whisper để transcribe audio tiếng Việt."""
+    client = Groq(api_key=os.environ['GROQ_API_KEY'])
+    audio_path = compress_audio_if_needed(audio_path)
+    with open(audio_path, 'rb') as f:
+        result = client.audio.transcriptions.create(
+            model='whisper-large-v3',
+            file=f,
+            language='vi',
+            response_format='text'
+        )
+    return result if isinstance(result, str) else result.text
 
 
 def run():
@@ -41,23 +57,35 @@ def run():
     print(f"  Meeting: {topic} ({meeting_id})")
     print(f"  Participants: {emails}")
 
-    # ── 2. Lấy recording + transcript từ Zoom ──────────────────────────────
-    print("\n[1/5] Tải transcript từ Zoom...")
+    # ── 2. Lấy audio từ Zoom → Whisper transcript ─────────────────────────
+    print("\n[1/5] Tải audio từ Zoom + transcribe bằng Groq Whisper...")
     recordings = get_recordings(meeting_uuid or meeting_id)
 
     files = recordings.get('recording_files', [])
-    transcript_file = next(
-        (f for f in files if f.get('file_type') == 'TRANSCRIPT'), None
+    # Ưu tiên M4A (audio only, nhỏ hơn), fallback sang MP4
+    audio_file = (
+        next((f for f in files if f.get('file_type') == 'M4A'), None) or
+        next((f for f in files if f.get('file_type') == 'MP4'), None)
     )
 
-    if not transcript_file:
-        notify_owner(f"⚠️ Cuộc họp <b>{topic}</b> không có transcript.\nKiểm tra Zoom AI Companion đã bật chưa.")
-        # Vẫn tiếp tục với transcript rỗng
-        transcript_text = "(Không có transcript tự động)"
+    if not audio_file:
+        notify_owner(f"⚠️ Cuộc họp <b>{topic}</b> không có file audio.\nKiểm tra Zoom cloud recording đã bật chưa.")
+        transcript_text = "(Không có audio recording)"
     else:
-        vtt_content     = download_transcript(transcript_file['download_url'])
-        transcript_text = parse_vtt(vtt_content)
-        print(f"  ✓ Transcript: {len(transcript_text)} ký tự")
+        ext = audio_file['file_type'].lower()
+        with tempfile.NamedTemporaryFile(suffix=f'.{ext}', delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            download_audio_file(audio_file['download_url'], tmp_path)
+            transcript_text = transcribe_with_whisper(tmp_path)
+            print(f"  ✓ Transcript (Whisper): {len(transcript_text)} ký tự")
+        finally:
+            # Dọn file tạm
+            for p in [tmp_path, tmp_path.rsplit('.', 1)[0] + '_compressed.mp3']:
+                try:
+                    os.unlink(p)
+                except FileNotFoundError:
+                    pass
 
     # ── 3. Lấy thông tin participants từ Sheets ────────────────────────────
     print("\n[2/5] Lấy thông tin team từ Google Sheets...")
