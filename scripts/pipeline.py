@@ -70,7 +70,7 @@ def run():
 
     # ── 2. Lấy audio từ Zoom → Whisper transcript ─────────────────────────
     print("\n[1/5] Tải audio từ Zoom + transcribe bằng Groq Whisper...")
-    recordings = get_recordings(meeting_uuid or meeting_id)
+    recordings = get_recordings(meeting_uuid, meeting_id=meeting_id)
 
     files = recordings.get('recording_files', [])
     # Ưu tiên M4A (audio only, nhỏ hơn), fallback sang MP4

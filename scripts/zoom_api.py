@@ -32,39 +32,53 @@ def get_access_token() -> str:
     return _token_cache['token']
 
 
-def get_recordings(meeting_uuid: str, retries: int = 6, wait: int = 30) -> dict:
-    """Get recording files for a meeting. Retries while audio is being processed."""
+def _encode_uuid(uuid: str) -> str:
+    """Encode UUID đúng chuẩn Zoom: double-encode nếu bắt đầu / hoặc có //"""
+    if uuid.startswith('/') or '//' in uuid:
+        return requests.utils.quote(requests.utils.quote(uuid, safe=''), safe='')
+    return requests.utils.quote(uuid, safe='')
+
+
+def get_recordings(meeting_uuid: str, meeting_id: str = '', retries: int = 6, wait: int = 30) -> dict:
+    """Get recording files. Thử UUID trước, fallback về numeric meeting_id nếu lỗi."""
     token = get_access_token()
-    # Double-encode chỉ khi UUID bắt đầu bằng "/" hoặc chứa "//"
-    if meeting_uuid.startswith('/') or '//' in meeting_uuid:
-        encoded_uuid = requests.utils.quote(requests.utils.quote(meeting_uuid, safe=''), safe='')
-    else:
-        encoded_uuid = requests.utils.quote(meeting_uuid, safe='')
+
+    # Danh sách ID để thử theo thứ tự
+    candidates = []
+    if meeting_uuid:
+        candidates.append(_encode_uuid(meeting_uuid))
+    if meeting_id:
+        candidates.append(meeting_id)
 
     for attempt in range(retries):
-        r = requests.get(
-            f"https://api.zoom.us/v2/meetings/{encoded_uuid}/recordings",
-            headers={'Authorization': f'Bearer {token}'},
-            timeout=15
-        )
-        if r.status_code == 404:
-            print(f"  ⏳ Recordings not ready (attempt {attempt+1}/{retries}), waiting {wait}s...")
-            time.sleep(wait)
-            token = get_access_token()
-            continue
-        r.raise_for_status()
-        data = r.json()
+        success = False
+        for candidate in candidates:
+            r = requests.get(
+                f"https://api.zoom.us/v2/meetings/{candidate}/recordings",
+                headers={'Authorization': f'Bearer {token}'},
+                timeout=15
+            )
+            if r.status_code in (400, 404):
+                print(f"  ⚠️ {r.status_code} với {candidate[:30]}..., thử ID khác...")
+                continue
+            if not r.ok:
+                print(f"  ⚠️ Lỗi {r.status_code}: {r.text[:200]}")
+                continue
 
-        files = data.get('recording_files', [])
-        # Ưu tiên M4A (audio only) để dùng với Whisper
-        has_audio = any(f.get('file_type') in ('M4A', 'MP4') for f in files)
-        if not has_audio and attempt < retries - 1:
-            print(f"  ⏳ Audio not ready yet (attempt {attempt+1}/{retries}), waiting {wait}s...")
-            time.sleep(wait)
-            token = get_access_token()
-            continue
+            data = r.json()
+            files = data.get('recording_files', [])
+            has_audio = any(f.get('file_type') in ('M4A', 'MP4') for f in files)
+            if not has_audio and attempt < retries - 1:
+                print(f"  ⏳ Audio chưa sẵn (attempt {attempt+1}/{retries}), chờ {wait}s...")
+                success = True  # candidate đúng, chỉ chưa có audio
+                break
+            return data
 
-        return data
+        if not success and attempt < retries - 1:
+            print(f"  ⏳ Chưa lấy được recording (attempt {attempt+1}/{retries}), chờ {wait}s...")
+
+        time.sleep(wait)
+        token = get_access_token()
 
     return {}
 
@@ -97,8 +111,8 @@ def compress_audio_if_needed(input_path: str) -> str:
     output_path = input_path.rsplit('.', 1)[0] + '_compressed.mp3'
     subprocess.run([
         'ffmpeg', '-i', input_path,
-        '-ac', '1',       # mono
-        '-b:a', '32k',    # 32kbps → ~14MB/giờ
+        '-ac', '1',
+        '-b:a', '32k',
         '-y', output_path
     ], check=True, capture_output=True)
     new_size = os.path.getsize(output_path) / (1024 * 1024)
