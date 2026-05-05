@@ -20,8 +20,19 @@ from sheets_manager import get_participants_for_meeting, log_meeting, log_action
 from telegram_notify import notify_meeting_done, notify_owner
 
 
+WHISPER_PROMPT = (
+    "Cuộc họp nội bộ công ty IDS (IDS International). "
+    "Sản phẩm: Castrol, L'Oréal, LPD, LDB, CPD. "
+    "Đối thủ: Total, Motul, Mobil. "
+    "Tên người: Nguyên, Giang, Nam, Tuấn, Vi, Hùng, Linh, Thảo, Khoa. "
+    "Thuật ngữ: doanh số, báo cáo, KPI, deadline, action item, "
+    "cashier, L'Oréal Professionnel, Garnier, Maybelline, "
+    "kế hoạch, phân phối, đại lý, garage, workshop."
+)
+
+
 def transcribe_with_whisper(audio_path: str) -> str:
-    """Dùng Groq Whisper để transcribe audio tiếng Việt."""
+    """Dùng Groq Whisper để transcribe audio tiếng Việt + tiếng Anh chuyên ngành."""
     client = Groq(api_key=os.environ['GROQ_API_KEY'])
     audio_path = compress_audio_if_needed(audio_path)
     with open(audio_path, 'rb') as f:
@@ -29,6 +40,7 @@ def transcribe_with_whisper(audio_path: str) -> str:
             model='whisper-large-v3',
             file=f,
             language='vi',
+            prompt=WHISPER_PROMPT,
             response_format='text'
         )
     return result if isinstance(result, str) else result.text
