@@ -6,7 +6,7 @@ import time
 from groq import Groq
 
 GROQ_MODEL = "llama-3.3-70b-versatile"
-MAX_TRANSCRIPT_CHARS = 10_000  # Groq context limit buffer
+MAX_TRANSCRIPT_CHARS = 60_000  # llama-3.3-70b có 128k context, 60k đủ cho 1.5h họp
 
 
 def analyze_meeting(transcript: str, meeting_title: str,

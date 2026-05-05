@@ -118,7 +118,10 @@ def run():
     # ── 5. Gửi email biên bản cho từng người ──────────────────────────────
     print("\n[4/5] Gửi email biên bản...")
     meeting_date = start_time[:10] if start_time else 'N/A'
-    send_all_minutes(topic, meeting_date, participants, analysis)
+    if participants:
+        send_all_minutes(topic, meeting_date, participants, analysis)
+    else:
+        print("  ⚠️ Không có participants, bỏ qua gửi email")
 
     # ── 6. Ghi vào Google Sheets ───────────────────────────────────────────
     print("\n[5/5] Ghi vào Google Sheets...")
