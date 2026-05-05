@@ -5,9 +5,9 @@ import base64
 import time
 import requests
 
-ZOOM_ACCOUNT_ID    = os.environ['ZOOM_ACCOUNT_ID']
-ZOOM_CLIENT_ID     = os.environ['ZOOM_CLIENT_ID']
-ZOOM_CLIENT_SECRET = os.environ['ZOOM_CLIENT_SECRET']
+ZOOM_ACCOUNT_ID    = os.environ['ZOOM_ACCOUNT_ID'].strip()
+ZOOM_CLIENT_ID     = os.environ['ZOOM_CLIENT_ID'].strip()
+ZOOM_CLIENT_SECRET = os.environ['ZOOM_CLIENT_SECRET'].strip()
 
 _token_cache = {'token': None, 'expires_at': 0}
 
@@ -24,7 +24,8 @@ def get_access_token() -> str:
         headers={'Authorization': f'Basic {creds}'},
         timeout=15
     )
-    r.raise_for_status()
+    if not r.ok:
+        raise Exception(f"Zoom token error {r.status_code}: {r.text}")
     data = r.json()
     _token_cache['token']      = data['access_token']
     _token_cache['expires_at'] = now + data.get('expires_in', 3600)
