@@ -26,6 +26,7 @@ jobs:
         env:
           IDS_EMAIL:          ${{ secrets.IDS_EMAIL }}
           IDS_EMAIL_PASSWORD: ${{ secrets.IDS_EMAIL_PASSWORD }}
+          IDS_SMTP_HOST:      ${{ secrets.IDS_SMTP_HOST }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
           MEETING_TITLE:      ${{ github.event.client_payload.meeting_title }}
