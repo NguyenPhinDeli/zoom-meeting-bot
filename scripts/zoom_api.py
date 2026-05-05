@@ -34,7 +34,11 @@ def get_access_token() -> str:
 def get_recordings(meeting_uuid: str, retries: int = 6, wait: int = 30) -> dict:
     """Get recording files for a meeting. Retries while audio is being processed."""
     token = get_access_token()
-    encoded_uuid = requests.utils.quote(requests.utils.quote(meeting_uuid, safe=''), safe='')
+    # Double-encode chỉ khi UUID bắt đầu bằng "/" hoặc chứa "//"
+    if meeting_uuid.startswith('/') or '//' in meeting_uuid:
+        encoded_uuid = requests.utils.quote(requests.utils.quote(meeting_uuid, safe=''), safe='')
+    else:
+        encoded_uuid = requests.utils.quote(meeting_uuid, safe='')
 
     for attempt in range(retries):
         r = requests.get(
