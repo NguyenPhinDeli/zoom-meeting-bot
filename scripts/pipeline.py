@@ -58,6 +58,8 @@ def run():
 
     try:
         emails = json.loads(emails_raw)
+        if not isinstance(emails, list):
+            emails = []
     except Exception:
         emails = []
 
@@ -79,7 +81,10 @@ def run():
         next((f for f in files if f.get('file_type') == 'MP4'), None)
     )
 
-    if not audio_file:
+    if not recordings:
+        notify_owner(f"⚠️ Cuộc họp <b>{topic}</b>: không lấy được recording từ Zoom.\nCó thể chưa bật cloud recording hoặc meeting quá ngắn.")
+        transcript_text = "(Không tìm được recording)"
+    elif not audio_file:
         notify_owner(f"⚠️ Cuộc họp <b>{topic}</b> không có file audio.\nKiểm tra Zoom cloud recording đã bật chưa.")
         transcript_text = "(Không có audio recording)"
     else:

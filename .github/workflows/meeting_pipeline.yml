@@ -51,7 +51,7 @@ jobs:
           TOPIC:                 ${{ github.event.client_payload.topic || inputs.topic }}
           START_TIME:            ${{ github.event.client_payload.start_time || inputs.start_time }}
           DURATION:              ${{ github.event.client_payload.duration || '60' }}
-          EMAILS_JSON:           ${{ toJson(github.event.client_payload.emails) || inputs.emails }}
+          EMAILS_JSON:           ${{ github.event_name == 'workflow_dispatch' && inputs.emails || toJson(github.event.client_payload.emails) }}
           HOST_EMAIL:            ${{ github.event.client_payload.host_email || '' }}
           ZOOM_ACCOUNT_ID:       ${{ secrets.ZOOM_ACCOUNT_ID }}
           ZOOM_CLIENT_ID:        ${{ secrets.ZOOM_CLIENT_ID }}
