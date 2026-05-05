@@ -3,6 +3,26 @@ name: Meeting Pipeline
 on:
   repository_dispatch:
     types: [process_recording, list_tasks]
+  workflow_dispatch:
+    inputs:
+      meeting_id:
+        description: 'Meeting ID (số)'
+        required: true
+      meeting_uuid:
+        description: 'Meeting UUID (từ Zoom)'
+        required: true
+      topic:
+        description: 'Tiêu đề cuộc họp'
+        required: true
+        default: 'Cuộc họp IDS'
+      start_time:
+        description: 'Start time (ISO)'
+        required: false
+        default: ''
+      emails:
+        description: 'Emails (JSON array, vd: ["a@b.com"])'
+        required: false
+        default: '["nguyen.phamdinh@gmail.com"]'
 
 jobs:
   run:
@@ -24,15 +44,15 @@ jobs:
 
       # ── process_recording: chạy pipeline sau khi meeting kết thúc ────────
       - name: Run meeting pipeline
-        if: github.event.action == 'process_recording'
+        if: github.event.action == 'process_recording' || github.event_name == 'workflow_dispatch'
         env:
-          MEETING_ID:            ${{ github.event.client_payload.meeting_id }}
-          MEETING_UUID:          ${{ github.event.client_payload.meeting_uuid }}
-          TOPIC:                 ${{ github.event.client_payload.topic }}
-          START_TIME:            ${{ github.event.client_payload.start_time }}
-          DURATION:              ${{ github.event.client_payload.duration }}
-          EMAILS_JSON:           ${{ toJson(github.event.client_payload.emails) }}
-          HOST_EMAIL:            ${{ github.event.client_payload.host_email }}
+          MEETING_ID:            ${{ github.event.client_payload.meeting_id || inputs.meeting_id }}
+          MEETING_UUID:          ${{ github.event.client_payload.meeting_uuid || inputs.meeting_uuid }}
+          TOPIC:                 ${{ github.event.client_payload.topic || inputs.topic }}
+          START_TIME:            ${{ github.event.client_payload.start_time || inputs.start_time }}
+          DURATION:              ${{ github.event.client_payload.duration || '60' }}
+          EMAILS_JSON:           ${{ toJson(github.event.client_payload.emails) || inputs.emails }}
+          HOST_EMAIL:            ${{ github.event.client_payload.host_email || '' }}
           ZOOM_ACCOUNT_ID:       ${{ secrets.ZOOM_ACCOUNT_ID }}
           ZOOM_CLIENT_ID:        ${{ secrets.ZOOM_CLIENT_ID }}
           ZOOM_CLIENT_SECRET:    ${{ secrets.ZOOM_CLIENT_SECRET }}
