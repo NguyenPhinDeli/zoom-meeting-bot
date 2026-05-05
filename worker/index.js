@@ -109,6 +109,17 @@ async function handleMeetingCommand(env, chatId, args) {
 
     await scheduleReminder(env, meeting.id, title, startTime, chatId);
 
+    // Gửi email invite qua GitHub Actions
+    await triggerGitHubActions(env, 'send_invitations', {
+      meeting_title: title,
+      start_time   : startTime,
+      duration_min : duration,
+      join_url     : meeting.join_url,
+      password     : meeting.password || '',
+      meeting_id   : String(meeting.id),
+      emails
+    });
+
     const dt    = new Date(`${dateStr}T${timeStr}:00+07:00`);
     const dtStr = dt.toLocaleString('vi-VN', {
       timeZone: 'Asia/Ho_Chi_Minh', weekday: 'long',

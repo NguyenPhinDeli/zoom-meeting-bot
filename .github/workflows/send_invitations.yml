@@ -1,0 +1,59 @@
+name: Send Meeting Invitations
+
+on:
+  repository_dispatch:
+    types: [send_invitations]
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Send invitations
+        env:
+          IDS_EMAIL:          ${{ secrets.IDS_EMAIL }}
+          IDS_EMAIL_PASSWORD: ${{ secrets.IDS_EMAIL_PASSWORD }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+          MEETING_TITLE:      ${{ github.event.client_payload.meeting_title }}
+          START_TIME:         ${{ github.event.client_payload.start_time }}
+          DURATION_MIN:       ${{ github.event.client_payload.duration_min }}
+          JOIN_URL:           ${{ github.event.client_payload.join_url }}
+          PASSWORD:           ${{ github.event.client_payload.password }}
+          MEETING_ID:         ${{ github.event.client_payload.meeting_id }}
+          EMAILS_JSON:        ${{ toJson(github.event.client_payload.emails) }}
+        run: |
+          cd scripts
+          python - <<'EOF'
+          import os, json
+          from invite_sender import send_all_invites
+
+          emails_json = os.environ.get('EMAILS_JSON', '[]')
+          emails = json.loads(emails_json)
+
+          participants = [{'email': e, 'name': e.split('@')[0]} for e in emails]
+
+          send_all_invites(
+              meeting_title  = os.environ['MEETING_TITLE'],
+              start_time_str = os.environ['START_TIME'],
+              duration_min   = int(os.environ['DURATION_MIN']),
+              join_url       = os.environ['JOIN_URL'],
+              password       = os.environ.get('PASSWORD', ''),
+              meeting_id     = os.environ['MEETING_ID'],
+              participants   = participants
+          )
+          print(f"✓ Gửi xong invite cho {len(participants)} người")
+          EOF
