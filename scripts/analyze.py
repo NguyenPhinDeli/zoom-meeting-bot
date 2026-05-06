@@ -5,7 +5,7 @@ import json
 import time
 import anthropic
 
-CLAUDE_MODEL = "claude-3-5-haiku-20241022"  # nhanh + rẻ (~$0.001/cuộc họp)
+CLAUDE_MODEL = "claude-haiku-4-5"  # nhanh + rẻ (~$0.001/cuộc họp)
 MAX_TRANSCRIPT_CHARS = 60_000
 
 
