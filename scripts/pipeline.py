@@ -70,38 +70,40 @@ def run():
     print(f"  Meeting: {topic} ({meeting_id})")
     print(f"  Participants: {emails}")
 
-    # ── 2. Lấy audio từ Zoom → Whisper transcript ─────────────────────────
+    # ── 2. Lấy audio → Whisper transcript ────────────────────────────────
     print("\n[1/5] Tải audio từ Zoom + transcribe bằng Groq Whisper...")
-    recordings = get_recordings(meeting_uuid, meeting_id=meeting_id)
 
-    files = recordings.get('recording_files', [])
-    # Ưu tiên M4A (audio only, nhỏ hơn), fallback sang MP4
-    audio_file = (
-        next((f for f in files if f.get('file_type') == 'M4A'), None) or
-        next((f for f in files if f.get('file_type') == 'MP4'), None)
-    )
+    # Ưu tiên URL từ webhook payload (nhanh, không cần API call)
+    audio_url  = os.environ.get('AUDIO_URL', '').strip()
+    audio_type = os.environ.get('AUDIO_TYPE', 'm4a').strip() or 'm4a'
 
-    if not recordings:
-        notify_owner(f"⚠️ Cuộc họp <b>{topic}</b>: không lấy được recording từ Zoom.\nCó thể chưa bật cloud recording hoặc meeting quá ngắn.")
-        transcript_text = "(Không tìm được recording)"
-    elif not audio_file:
-        notify_owner(f"⚠️ Cuộc họp <b>{topic}</b> không có file audio.\nKiểm tra Zoom cloud recording đã bật chưa.")
+    # Fallback: gọi Zoom API nếu không có URL từ webhook
+    if not audio_url:
+        print("  ℹ️ Không có audio_url từ webhook, thử lấy qua API...")
+        recordings = get_recordings(meeting_uuid, meeting_id=meeting_id)
+        files = recordings.get('recording_files', [])
+        audio_rec = (
+            next((f for f in files if f.get('file_type') == 'M4A'), None) or
+            next((f for f in files if f.get('file_type') == 'MP4'), None)
+        )
+        if audio_rec:
+            audio_url  = audio_rec['download_url']
+            audio_type = audio_rec['file_type'].lower()
+
+    if not audio_url:
+        notify_owner(f"⚠️ Cuộc họp <b>{topic}</b>: không lấy được recording.\nKiểm tra Zoom cloud recording đã bật chưa.")
         transcript_text = "(Không có audio recording)"
     else:
-        ext = audio_file['file_type'].lower()
-        with tempfile.NamedTemporaryFile(suffix=f'.{ext}', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=f'.{audio_type}', delete=False) as tmp:
             tmp_path = tmp.name
         try:
-            download_audio_file(audio_file['download_url'], tmp_path)
+            download_audio_file(audio_url, tmp_path)
             transcript_text = transcribe_with_whisper(tmp_path)
             print(f"  ✓ Transcript (Whisper): {len(transcript_text)} ký tự")
         finally:
-            # Dọn file tạm
             for p in [tmp_path, tmp_path.rsplit('.', 1)[0] + '_compressed.mp3']:
-                try:
-                    os.unlink(p)
-                except FileNotFoundError:
-                    pass
+                try: os.unlink(p)
+                except FileNotFoundError: pass
 
     # ── 3. Lấy thông tin participants từ Sheets ────────────────────────────
     print("\n[2/5] Lấy thông tin team từ Google Sheets...")

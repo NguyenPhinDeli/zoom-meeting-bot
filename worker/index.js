@@ -201,6 +201,11 @@ async function handleZoom(request, env) {
     const stored     = await env.MEETINGS_KV.get(`meeting:${meetingId}`);
     const info       = stored ? JSON.parse(stored) : null;
 
+    // Lấy audio URL trực tiếp từ webhook payload — tránh phải gọi API riêng
+    const recFiles = meetingObj.recording_files || [];
+    const audioRec = recFiles.find(f => f.file_type === 'M4A')
+                  || recFiles.find(f => f.file_type === 'MP4');
+
     await triggerGitHubActions(env, 'process_recording', {
       meeting_id   : meetingId,
       meeting_uuid : meetingObj.uuid || '',
@@ -208,7 +213,9 @@ async function handleZoom(request, env) {
       start_time   : meetingObj.start_time || info?.start_time || '',
       duration     : meetingObj.duration || info?.duration || 0,
       emails       : info?.emails || [],
-      host_email   : meetingObj.host_email || ''
+      host_email   : meetingObj.host_email || '',
+      audio_url    : audioRec?.download_url || '',
+      audio_type   : (audioRec?.file_type || '').toLowerCase()
     });
   }
   return ok();
