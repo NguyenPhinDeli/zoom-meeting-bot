@@ -9,8 +9,9 @@ on:
         description: 'Meeting ID (số)'
         required: true
       meeting_uuid:
-        description: 'Meeting UUID (từ Zoom)'
-        required: true
+        description: 'Meeting UUID (để trống để dùng meeting_id)'
+        required: false
+        default: ''
       topic:
         description: 'Tiêu đề cuộc họp'
         required: true
