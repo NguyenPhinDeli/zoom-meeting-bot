@@ -64,6 +64,8 @@ jobs:
           IDS_EMAIL:             ${{ secrets.IDS_EMAIL }}
           IDS_EMAIL_PASSWORD:    ${{ secrets.IDS_EMAIL_PASSWORD }}
           IDS_SMTP_HOST:         ${{ secrets.IDS_SMTP_HOST }}
+          GMAIL_ADDRESS:         ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD:    ${{ secrets.GMAIL_APP_PASSWORD }}
           TELEGRAM_BOT_TOKEN:    ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID:      ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_GROUP_ID:     ${{ secrets.TELEGRAM_GROUP_ID }}

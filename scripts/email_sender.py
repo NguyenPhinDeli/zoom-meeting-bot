@@ -15,10 +15,10 @@ try:
 except ImportError:
     HAS_ICAL = False
 
-SMTP_HOST = os.environ.get('IDS_SMTP_HOST', 'pro201.emailserver.vn')
-SMTP_PORT = int(os.environ.get('IDS_SMTP_PORT', '587'))
-SMTP_USER = os.environ['IDS_EMAIL']
-SMTP_PASS = os.environ['IDS_EMAIL_PASSWORD']
+SMTP_HOST = 'smtp.gmail.com'
+SMTP_PORT = 587
+SMTP_USER = os.environ['GMAIL_ADDRESS']
+SMTP_PASS = os.environ['GMAIL_APP_PASSWORD']
 VN_TZ     = None
 
 if HAS_ICAL:
