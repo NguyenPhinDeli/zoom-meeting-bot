@@ -181,11 +181,11 @@ def _build_html(meeting_title: str, meeting_date: str, recipient_name: str,
     my_items = [i for i in items if (i.get('pic_email') or i.get('assignee_email')) == recipient_email]
     my_items_html = ''
     if my_items and not is_ceo:
-        my_rows = ''.join(
-            f'<li>{"🔴 Làm ngay" if i.get("type") == "immediate" else f"📅 {i.get(\"deadline\",\"?\")}"}  — '
-            f'{i.get("viec") or i.get("task","")}</li>'
-            for i in my_items
-        )
+        def _my_row(i):
+            dl = '🔴 Làm ngay' if i.get('type') == 'immediate' else f'📅 {i.get("deadline","?")}'
+            task = i.get('viec') or i.get('task', '')
+            return f'<li>{dl} — {task}</li>'
+        my_rows = ''.join(_my_row(i) for i in my_items)
         my_items_html = f"""
 <div style="background:#fff8e1;border-left:4px solid #f39c12;padding:12px 16px;margin-top:12px;border-radius:4px">
   <strong>⚠️ Việc được giao cho bạn:</strong>
