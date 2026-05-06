@@ -59,7 +59,7 @@ def get_recordings(meeting_uuid: str, meeting_id: str = '', retries: int = 6, wa
                 timeout=15
             )
             if r.status_code in (400, 404):
-                print(f"  ⚠️ {r.status_code} với {candidate[:30]}..., thử ID khác...")
+                print(f"  ⚠️ {r.status_code} với {candidate[:30]}: {r.text[:300]}")
                 continue
             if not r.ok:
                 print(f"  ⚠️ Lỗi {r.status_code}: {r.text[:200]}")
