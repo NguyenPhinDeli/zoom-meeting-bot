@@ -5,7 +5,7 @@ import json
 import time
 import anthropic
 
-CLAUDE_MODEL = "claude-haiku-4-5"          # nhanh + rẻ (~$0.001/cuộc họp)
+CLAUDE_MODEL = "claude-3-5-haiku-20241022"  # nhanh + rẻ (~$0.001/cuộc họp)
 MAX_TRANSCRIPT_CHARS = 60_000
 
 
@@ -122,7 +122,7 @@ Lưu ý bắt buộc:
                         item['assignee_email'] = item['pic_email']
             return data
         except Exception as e:
-            print(f"  ⚠️ Groq lỗi lần {attempt+1}: {e}")
+            print(f"  ⚠️ Claude API lỗi lần {attempt+1}: {type(e).__name__}: {e}")
             if attempt < 2:
                 time.sleep(2 ** attempt)
 
