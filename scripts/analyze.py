@@ -11,7 +11,8 @@ MAX_TRANSCRIPT_CHARS = 60_000
 
 def analyze_meeting(transcript: str, meeting_title: str,
                     participants: list[dict],
-                    start_time: str = '', duration: int = 0) -> dict:
+                    start_time: str = '', duration: int = 0,
+                    host_email: str = '') -> dict:
     """
     params:
       participants: [{"name": "Nam", "email": "nam@ids.vn", "role": "Sales"}]
@@ -30,6 +31,9 @@ def analyze_meeting(transcript: str, meeting_title: str,
     if len(transcript) > MAX_TRANSCRIPT_CHARS:
         transcript_trimmed += '\n[... transcript đã được rút gọn ...]'
 
+    # Host info
+    host_info = f" (host: {host_email})" if host_email else ''
+
     # Format thời gian đẹp hơn
     time_str = start_time or 'Không rõ'
     duration_str = f"{duration} phút" if duration else ''
@@ -40,6 +44,7 @@ Hãy phân tích transcript cuộc họp và tạo biên bản họp chính th�
 Tiêu đề cuộc họp: {meeting_title}
 Thời gian: {time_str} {duration_str}
 
+Người tổ chức (host){host_info}: suy ra tên từ email hoặc transcript để điền vào chu_tri
 Danh sách mời (có thể vắng nếu transcript không đề cập):
 {participants_str}
 

@@ -65,7 +65,17 @@ def _deadline_label(item: dict) -> str:
     return item['deadline']
 
 
-def _build_action_table(items: list[dict], highlight_email: str = '') -> str:
+def _is_mine(item: dict, recipient_email: str, recipient_name: str) -> bool:
+    """Chỉ highlight khi email khớp VÀ tên PIC khớp tên người nhận."""
+    pic_email = item.get('pic_email') or item.get('assignee_email', '')
+    pic_name  = (item.get('pic_name') or '').lower()
+    rname     = recipient_name.lower()
+    email_match = pic_email == recipient_email
+    name_match  = bool(pic_name) and (pic_name in rname or rname in pic_name)
+    return email_match and name_match
+
+
+def _build_action_table(items: list[dict], highlight_email: str = '', highlight_name: str = '') -> str:
     """Render bảng action items dạng table HTML."""
     if not items:
         return '<p style="color:#888;font-style:italic">Không có action item.</p>'
@@ -79,8 +89,11 @@ def _build_action_table(items: list[dict], highlight_email: str = '') -> str:
         deadline_td  = _deadline_label(item)
         priority_td  = _priority_label(item.get('priority', 'medium'))
 
-        # Highlight dòng của người nhận
-        is_mine = pic_email == highlight_email
+        # Highlight dòng của người nhận (email khớp VÀ tên khớp)
+        pic_name_lower = pic_name.lower() if pic_name else ''
+        rname_lower    = highlight_name.lower()
+        is_mine = (pic_email == highlight_email) and bool(pic_name_lower) and \
+                  (pic_name_lower in rname_lower or rname_lower in pic_name_lower)
         row_bg  = '#fff8e1' if is_mine else ('white' if i % 2 else '#f9f9f9')
         marker  = ' ◀ Bạn' if is_mine else ''
 
@@ -175,10 +188,10 @@ def _build_html(meeting_title: str, meeting_date: str, recipient_name: str,
 
     # ── 5. Kế hoạch hành động ──────────────────────────────────────────────
     # CEO thấy tất cả, người thường thấy tất cả (nhưng dòng của mình được highlight)
-    action_table = _build_action_table(items, highlight_email=recipient_email)
+    action_table = _build_action_table(items, highlight_email=recipient_email, highlight_name=recipient_name)
 
-    # Lọc my_items để highlight phần "Việc của bạn"
-    my_items = [i for i in items if (i.get('pic_email') or i.get('assignee_email')) == recipient_email]
+    # Lọc my_items: email khớp VÀ tên PIC khớp tên người nhận
+    my_items = [i for i in items if _is_mine(i, recipient_email, recipient_name)]
     my_items_html = ''
     if my_items and not is_ceo:
         def _my_row(i):

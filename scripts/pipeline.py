@@ -114,7 +114,8 @@ def run():
     print("\n[3/5] Phân tích transcript bằng Groq AI...")
     duration = int(os.environ.get('DURATION', '0') or '0')
     analysis = analyze_meeting(transcript_text, topic, participants,
-                               start_time=start_time, duration=duration)
+                               start_time=start_time, duration=duration,
+                               host_email=host_email)
     action_items = analysis.get('action_items', [])
     keywords     = analysis.get('keywords', [])
     print(f"  ✓ {len(action_items)} action item(s), {len(keywords)} keywords")
