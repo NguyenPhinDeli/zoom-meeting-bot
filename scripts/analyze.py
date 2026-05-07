@@ -117,6 +117,9 @@ Lưu ý bắt buộc:
                 if raw.startswith('json'):
                     raw = raw[4:]
             data = json.loads(raw)
+            # Override chu_tri bằng host_email từ Zoom (chính xác hơn Claude đoán)
+            if host_email and 'thong_tin_chung' in data:
+                data['thong_tin_chung']['chu_tri'] = host_email
             # Backward-compat: đảm bảo key cũ vẫn tồn tại cho pipeline.py
             if 'action_items' in data:
                 for i, item in enumerate(data['action_items']):
