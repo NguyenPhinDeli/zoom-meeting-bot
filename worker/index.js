@@ -30,10 +30,11 @@ async function handleTelegram(request, env) {
   }
 
   const lower = text.trim().toLowerCase();
-  if (lower.startsWith('/meeting ')) return handleMeetingCommand(env, chatId, text.slice(9).trim());
+  if (lower.startsWith('/meeting '))  return handleMeetingCommand(env, chatId, text.slice(9).trim());
   if (lower === '/meetings')          return handleListMeetings(env, chatId);
   if (lower === '/tasks')             return handleListTasks(env, chatId);
   if (lower === '/help')              return handleHelp(env, chatId);
+  if (lower.startsWith('/send_all ')) return handleSendAll(env, chatId, text.slice(10).trim());
 
   await tgSend(env, chatId, '❓ Lệnh không hợp lệ. Gõ /help để xem hướng dẫn.');
   return ok();
@@ -162,6 +163,21 @@ async function handleListMeetings(env, chatId) {
       msg += `• <b>${m.topic}</b>\n  ${dt} · ${m.duration} phút\n  🔗 <a href="${m.join_url}">Join</a>\n\n`;
     }
     await tgSend(env, chatId, msg);
+  } catch (err) {
+    await tgSend(env, chatId, `❌ Lỗi: ${err.message}`);
+  }
+  return ok();
+}
+
+async function handleSendAll(env, chatId, meetingId) {
+  if (!meetingId) {
+    await tgSend(env, chatId, '❌ Thiếu meeting ID. Dùng: /send_all [meeting_id]');
+    return ok();
+  }
+  await tgSend(env, chatId, `⏳ Đang gửi biên bản cho team (meeting ${meetingId})...`);
+  try {
+    await triggerGitHubActions(env, 'send_minutes_final', { meeting_id: meetingId });
+    await tgSend(env, chatId, '✅ Đã kích hoạt gửi biên bản. Hoàn tất trong ~2 phút.');
   } catch (err) {
     await tgSend(env, chatId, `❌ Lỗi: ${err.message}`);
   }

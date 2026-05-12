@@ -80,7 +80,8 @@ def _init_headers(sheets, sid: str):
     headers = {
         'Team': [['Tên', 'Email', 'Vai trò', 'Active (TRUE/FALSE)']],
         'Meetings': [['Meeting ID', 'Tiêu đề', 'Ngày', 'Participants', 'Keywords', 'Minutes URL', 'Created At']],
-        'ActionItems': [['Meeting ID', 'Task', 'Assignee Email', 'Deadline', 'Type', 'Priority', 'Status', 'Reminded', 'Created At']]
+        'ActionItems': [['Meeting ID', 'Task', 'Assignee Email', 'Deadline', 'Type', 'Priority', 'Status', 'Reminded', 'Created At']],
+        'Drafts': [['Meeting ID', 'Topic', 'Start Time', 'Host Email', 'Emails JSON', 'Participants JSON', 'Doc ID', 'Doc URL', 'Status', 'Created At']]
     }
     data = []
     for sheet_name, rows in headers.items():
@@ -174,6 +175,70 @@ def log_action_items(meeting_id: str, action_items: list[dict]):
         body={'values': rows}
     ).execute()
     print(f"  ✓ Ghi {len(rows)} action items vào Google Sheets")
+
+
+def save_draft(meeting_id: str, topic: str, start_time: str, host_email: str,
+               emails: list, participants: list, doc_id: str, doc_url: str):
+    """Lưu draft biên bản vào tab Drafts."""
+    import json as _json
+    sheets = _sheets_service()
+    sid    = get_or_create_spreadsheet()
+    sheets.spreadsheets().values().append(
+        spreadsheetId=sid,
+        range='Drafts!A:J',
+        valueInputOption='RAW',
+        insertDataOption='INSERT_ROWS',
+        body={'values': [[
+            meeting_id, topic, start_time, host_email,
+            _json.dumps(emails, ensure_ascii=False),
+            _json.dumps(participants, ensure_ascii=False),
+            doc_id, doc_url, 'pending',
+            datetime.now().isoformat()
+        ]]}
+    ).execute()
+    print(f"  ✓ Draft lưu vào Sheets: {doc_url}")
+
+
+def get_draft(meeting_id: str) -> dict | None:
+    """Lấy thông tin draft theo meeting_id."""
+    import json as _json
+    sheets = _sheets_service()
+    sid    = get_or_create_spreadsheet()
+    result = sheets.spreadsheets().values().get(
+        spreadsheetId=sid, range='Drafts!A2:J'
+    ).execute()
+    for row in result.get('values', []):
+        if len(row) >= 9 and row[0] == str(meeting_id):
+            return {
+                'meeting_id'  : row[0],
+                'topic'       : row[1],
+                'start_time'  : row[2],
+                'host_email'  : row[3],
+                'emails'      : _json.loads(row[4]),
+                'participants': _json.loads(row[5]),
+                'doc_id'      : row[6],
+                'doc_url'     : row[7],
+                'status'      : row[8],
+            }
+    return None
+
+
+def mark_draft_sent(meeting_id: str):
+    """Đánh dấu draft đã gửi."""
+    sheets = _sheets_service()
+    sid    = get_or_create_spreadsheet()
+    result = sheets.spreadsheets().values().get(
+        spreadsheetId=sid, range='Drafts!A2:A'
+    ).execute()
+    for i, row in enumerate(result.get('values', []), start=2):
+        if row and row[0] == str(meeting_id):
+            sheets.spreadsheets().values().update(
+                spreadsheetId=sid,
+                range=f'Drafts!I{i}',
+                valueInputOption='RAW',
+                body={'values': [['sent']]}
+            ).execute()
+            break
 
 
 def get_due_soon_tasks(hours_ahead: int = 48) -> list[dict]:

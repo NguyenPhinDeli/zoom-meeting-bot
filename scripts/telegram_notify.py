@@ -36,6 +36,20 @@ def notify_group(text: str):
     return False
 
 
+def notify_draft_ready(meeting_title: str, meeting_date: str,
+                       meeting_id: str, doc_url: str, action_items_count: int):
+    """Thông báo draft biên bản đã sẵn sàng để CEO duyệt."""
+    msg = (
+        f'📋 <b>Draft biên bản sẵn sàng!</b>\n\n'
+        f'📌 {meeting_title}\n'
+        f'📅 {meeting_date}\n'
+        f'📝 {action_items_count} action item(s)\n\n'
+        f'🔗 <a href="{doc_url}">Xem &amp; chỉnh sửa Google Doc</a>\n\n'
+        f'✅ Gõ <code>/send_all {meeting_id}</code> để gửi cho team.'
+    )
+    notify_owner(msg)
+
+
 def notify_meeting_done(meeting_title: str, meeting_date: str,
                         action_items_count: int, participants: list[dict]):
     """Thông báo sau khi pipeline hoàn tất."""

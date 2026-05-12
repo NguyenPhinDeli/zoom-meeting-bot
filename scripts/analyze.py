@@ -153,3 +153,62 @@ Lưu ý bắt buộc:
         "summaries_by_role": {},
         "keywords": []
     }
+
+
+def reanalyze_from_doc(doc_text: str, meeting_title: str,
+                       participants: list, host_email: str = '') -> dict:
+    """Re-parse nội dung Google Doc (sau khi CEO chỉnh sửa) → JSON 6-section."""
+    client = anthropic.Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
+
+    participant_emails = [p['email'] for p in participants]
+    participants_str   = '\n'.join(
+        f"- {p['name']} ({p.get('role','Nhân viên')}): {p['email']}"
+        for p in participants
+    )
+
+    prompt = f"""Bạn là trợ lý AI của IDS. Dưới đây là nội dung biên bản họp đã được CEO chỉnh sửa.
+Hãy đọc và trả về JSON 6-section chuẩn (không thêm markdown):
+
+Tiêu đề: {meeting_title}
+Host: {host_email}
+Participants:
+{participants_str}
+
+Nội dung biên bản (đã được CEO chỉnh sửa):
+---
+{doc_text[:40000]}
+---
+
+Trả về JSON với cấu trúc giống như analyze_meeting (thong_tin_chung, muc_tieu, noi_dung_thao_luan, quyet_dinh, action_items, hop_tiep_theo, summary_ceo, summaries_by_role, keywords).
+pic_email trong action_items phải dùng email từ danh sách: {participant_emails}
+"""
+
+    for attempt in range(3):
+        try:
+            resp = client.messages.create(
+                model=CLAUDE_MODEL,
+                max_tokens=4096,
+                temperature=0.2,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = resp.content[0].text.strip()
+            if raw.startswith('```'):
+                raw = raw.split('```')[1]
+                if raw.startswith('json'):
+                    raw = raw[4:]
+            data = json.loads(raw)
+            if host_email and 'thong_tin_chung' in data:
+                data['thong_tin_chung']['chu_tri'] = host_email
+            if 'action_items' in data:
+                for item in data['action_items']:
+                    if 'viec' in item and 'task' not in item:
+                        item['task'] = item['viec']
+                    if 'pic_email' in item and 'assignee_email' not in item:
+                        item['assignee_email'] = item['pic_email']
+            return data
+        except Exception as e:
+            print(f"  ⚠️ Re-analyze lỗi lần {attempt+1}: {e}")
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+
+    return {}  # Fallback rỗng

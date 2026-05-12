@@ -16,8 +16,9 @@ from groq           import Groq
 from zoom_api       import get_recordings, download_audio_file, compress_audio_if_needed
 from analyze        import analyze_meeting
 from email_sender   import send_all_minutes
-from sheets_manager import get_participants_for_meeting, log_meeting, log_action_items
-from telegram_notify import notify_meeting_done, notify_owner
+from sheets_manager import get_participants_for_meeting, log_meeting, log_action_items, save_draft
+from telegram_notify import notify_meeting_done, notify_owner, notify_draft_ready
+from gdoc_manager   import create_draft_doc
 
 
 WHISPER_PROMPT = (
@@ -120,23 +121,21 @@ def run():
     keywords     = analysis.get('keywords', [])
     print(f"  ✓ {len(action_items)} action item(s), {len(keywords)} keywords")
 
-    # ── 5. Gửi email biên bản cho từng người ──────────────────────────────
-    print("\n[4/5] Gửi email biên bản...")
     meeting_date = start_time[:10] if start_time else 'N/A'
-    if participants:
-        send_all_minutes(topic, meeting_date, participants, analysis)
-    else:
-        print("  ⚠️ Không có participants, bỏ qua gửi email")
 
-    # ── 6. Ghi vào Google Sheets ───────────────────────────────────────────
-    print("\n[5/5] Ghi vào Google Sheets...")
-    log_meeting(meeting_id, topic, start_time, participants, keywords)
-    log_action_items(meeting_id, action_items)
+    # ── 5. Tạo Google Doc draft để CEO duyệt ──────────────────────────────
+    print("\n[4/5] Tạo Google Doc draft...")
+    doc_id, doc_url = create_draft_doc(topic, analysis, participants)
 
-    # ── 7. Thông báo hoàn tất cho anh Nguyên ──────────────────────────────
-    notify_meeting_done(topic, meeting_date, len(action_items), participants)
+    # ── 6. Lưu draft vào Sheets + notify CEO qua Telegram ─────────────────
+    print("\n[5/5] Lưu draft + notify Telegram...")
+    save_draft(meeting_id, topic, start_time, host_email,
+               emails, participants, doc_id, doc_url)
+    notify_draft_ready(topic, meeting_date, meeting_id, doc_url, len(action_items))
 
-    print("\n== PIPELINE HOÀN THÀNH ==")
+    print("\n== PHASE 1 HOÀN THÀNH — Chờ CEO duyệt ==")
+    print(f"  Google Doc: {doc_url}")
+    print(f"  Gõ /send_all {meeting_id} trên Telegram để gửi team")
     return 0
 
 
