@@ -16,7 +16,7 @@ from groq           import Groq
 from zoom_api       import get_recordings, download_audio_file, compress_audio_if_needed
 from analyze        import analyze_meeting
 from email_sender   import send_all_minutes
-from sheets_manager import get_participants_for_meeting, log_meeting, log_action_items, save_draft
+from sheets_manager import get_participants_for_meeting, get_team, log_meeting, log_action_items, save_draft
 from telegram_notify import notify_meeting_done, notify_owner, notify_draft_ready
 from gdoc_manager   import create_draft_doc
 
@@ -117,17 +117,18 @@ def run():
                 try: os.unlink(p)
                 except FileNotFoundError: pass
 
-    # ── 3. Lấy thông tin participants từ Sheets ────────────────────────────
+    # ── 3. Lấy thông tin participants + full team từ Sheets ───────────────
     print("\n[2/5] Lấy thông tin team từ Google Sheets...")
     participants = get_participants_for_meeting(emails)
-    print(f"  ✓ {len(participants)} người tham gia")
+    full_team    = get_team()  # toàn bộ team để Claude map tên → email chính xác
+    print(f"  ✓ {len(participants)} người tham gia, {len(full_team)} thành viên team")
 
     # ── 4. Phân tích transcript bằng Groq ─────────────────────────────────
     print("\n[3/5] Phân tích transcript bằng Groq AI...")
     duration = int(os.environ.get('DURATION', '0') or '0')
     analysis = analyze_meeting(transcript_text, topic, participants,
                                start_time=start_time, duration=duration,
-                               host_email=host_email)
+                               host_email=host_email, full_team=full_team)
     action_items = analysis.get('action_items', [])
     keywords     = analysis.get('keywords', [])
     print(f"  ✓ {len(action_items)} action item(s), {len(keywords)} keywords")

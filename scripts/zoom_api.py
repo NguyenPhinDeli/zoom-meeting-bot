@@ -88,7 +88,7 @@ def download_audio_file(download_url: str, output_path: str) -> str:
     token = get_access_token()
     r = requests.get(
         f"{download_url}?access_token={token}",
-        timeout=120,
+        timeout=300,
         stream=True
     )
     r.raise_for_status()

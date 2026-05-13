@@ -12,7 +12,7 @@ MAX_TRANSCRIPT_CHARS = 60_000
 def analyze_meeting(transcript: str, meeting_title: str,
                     participants: list[dict],
                     start_time: str = '', duration: int = 0,
-                    host_email: str = '') -> dict:
+                    host_email: str = '', full_team: list = None) -> dict:
     """
     params:
       participants: [{"name": "Nam", "email": "nam@ids.vn", "role": "Sales"}]
@@ -24,7 +24,14 @@ def analyze_meeting(transcript: str, meeting_title: str,
         f"- {p['name']} ({p.get('role','Nhân viên')}): {p['email']}"
         for p in participants
     )
-    participant_emails = [p['email'] for p in participants]
+
+    # Full team để map tên → email chính xác cho PIC
+    team_for_mapping   = full_team if full_team else participants
+    participant_emails = [p['email'] for p in team_for_mapping]
+    team_str = '\n'.join(
+        f"- {p['name']} ({p.get('role','Nhân viên')}): {p['email']}"
+        for p in team_for_mapping
+    )
 
     # Truncate transcript if too long
     transcript_trimmed = transcript[:MAX_TRANSCRIPT_CHARS]
@@ -45,8 +52,12 @@ Tiêu đề cuộc họp: {meeting_title}
 Thời gian: {time_str} {duration_str}
 
 Người tổ chức (host){host_info}: suy ra tên từ email hoặc transcript để điền vào chu_tri
-Danh sách mời (có thể vắng nếu transcript không đề cập):
+
+Người tham dự cuộc họp (được mời):
 {participants_str}
+
+Toàn bộ team IDS (dùng để map tên → email chính xác cho PIC trong action items):
+{team_str}
 
 Transcript:
 ---
@@ -96,7 +107,8 @@ Trả về JSON (không thêm markdown, không comment):
 Lưu ý bắt buộc:
 - action_items là phần QUAN TRỌNG NHẤT — liệt kê đầy đủ, rõ ràng, đúng người
 - summaries_by_role phải có key là email của mỗi người trong danh sách tham dự
-- pic_email trong action_items phải là email từ danh sách: {participant_emails}
+- pic_email trong action_items phải dùng email từ danh sách team: {participant_emails}
+- Khi nghe tên trong transcript (vd: "anh Đạt", "chị Giang") → tra trong team list để lấy email đúng
 - Nếu người phụ trách không rõ email → dùng email của host/chủ trì
 - immediate = làm ngay (deadline = null), deadline = có ngày cụ thể
 """
