@@ -74,12 +74,23 @@ def run():
     # ── 2. Lấy audio → Whisper transcript ────────────────────────────────
     print("\n[1/5] Tải audio từ Zoom + transcribe bằng Groq Whisper...")
 
-    # Ưu tiên URL từ webhook payload (nhanh, không cần API call)
-    audio_url  = os.environ.get('AUDIO_URL', '').strip()
-    audio_type = os.environ.get('AUDIO_TYPE', 'm4a').strip() or 'm4a'
+    # Mock transcript cho testing
+    mock_transcript = os.environ.get('MOCK_TRANSCRIPT', '').strip()
+    if mock_transcript:
+        print("  ℹ️ Dùng MOCK_TRANSCRIPT để test")
+        transcript_text = mock_transcript
+        # Skip audio download
+        print(f"  ✓ Transcript (mock): {len(transcript_text)} ký tự")
+
+    if mock_transcript:
+        pass  # đã set transcript_text ở trên, skip audio
+    else:
+      # Ưu tiên URL từ webhook payload (nhanh, không cần API call)
+      audio_url  = os.environ.get('AUDIO_URL', '').strip()
+      audio_type = os.environ.get('AUDIO_TYPE', 'm4a').strip() or 'm4a'
 
     # Fallback: gọi Zoom API nếu không có URL từ webhook
-    if not audio_url:
+    if not mock_transcript and not audio_url:
         print("  ℹ️ Không có audio_url từ webhook, thử lấy qua API...")
         recordings = get_recordings(meeting_uuid, meeting_id=meeting_id)
         files = recordings.get('recording_files', [])
@@ -91,10 +102,10 @@ def run():
             audio_url  = audio_rec['download_url']
             audio_type = audio_rec['file_type'].lower()
 
-    if not audio_url:
+    if not mock_transcript and not audio_url:
         notify_owner(f"⚠️ Cuộc họp <b>{topic}</b>: không lấy được recording.\nKiểm tra Zoom cloud recording đã bật chưa.")
         transcript_text = "(Không có audio recording)"
-    else:
+    elif not mock_transcript:
         with tempfile.NamedTemporaryFile(suffix=f'.{audio_type}', delete=False) as tmp:
             tmp_path = tmp.name
         try:

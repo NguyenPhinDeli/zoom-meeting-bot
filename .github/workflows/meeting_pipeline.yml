@@ -24,6 +24,10 @@ on:
         description: 'Emails (JSON array, vd: ["a@b.com"])'
         required: false
         default: '["nguyen.phamdinh@gmail.com"]'
+      mock_transcript:
+        description: 'Transcript giả để test (bỏ trống nếu dùng Zoom thật)'
+        required: false
+        default: ''
 
 jobs:
   run:
@@ -56,6 +60,7 @@ jobs:
           HOST_EMAIL:            ${{ github.event.client_payload.host_email || '' }}
           AUDIO_URL:             ${{ github.event.client_payload.audio_url || '' }}
           AUDIO_TYPE:            ${{ github.event.client_payload.audio_type || 'm4a' }}
+          MOCK_TRANSCRIPT:       ${{ inputs.mock_transcript || '' }}
           ZOOM_ACCOUNT_ID:       ${{ secrets.ZOOM_ACCOUNT_ID }}
           ZOOM_CLIENT_ID:        ${{ secrets.ZOOM_CLIENT_ID }}
           ZOOM_CLIENT_SECRET:    ${{ secrets.ZOOM_CLIENT_SECRET }}
