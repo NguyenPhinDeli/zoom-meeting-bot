@@ -199,7 +199,7 @@ def save_draft(meeting_id: str, topic: str, start_time: str, host_email: str,
     print(f"  ✓ Draft lưu vào Sheets: {doc_url}")
 
 
-def get_draft(meeting_id: str) -> dict | None:
+def get_draft(meeting_id: str):
     """Lấy thông tin draft theo meeting_id."""
     import json as _json
     sheets = _sheets_service()
