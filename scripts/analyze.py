@@ -117,7 +117,7 @@ Lưu ý bắt buộc:
         try:
             resp = client.messages.create(
                 model=CLAUDE_MODEL,
-                max_tokens=4096,
+                max_tokens=8192,
                 temperature=0.3,
                 messages=[{"role": "user", "content": prompt}],
             )
@@ -199,7 +199,7 @@ pic_email trong action_items phải dùng email từ danh sách: {participant_em
         try:
             resp = client.messages.create(
                 model=CLAUDE_MODEL,
-                max_tokens=4096,
+                max_tokens=8192,
                 temperature=0.2,
                 messages=[{"role": "user", "content": prompt}],
             )
