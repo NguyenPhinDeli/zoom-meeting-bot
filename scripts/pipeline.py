@@ -33,17 +33,25 @@ WHISPER_PROMPT = (
 
 def transcribe_with_whisper(audio_path: str) -> str:
     """Dùng Groq Whisper để transcribe audio tiếng Việt + tiếng Anh chuyên ngành."""
-    client = Groq(api_key=os.environ['GROQ_API_KEY'])
+    import groq as groq_lib
+    client     = Groq(api_key=os.environ['GROQ_API_KEY'])
     audio_path = compress_audio_if_needed(audio_path)
-    with open(audio_path, 'rb') as f:
-        result = client.audio.transcriptions.create(
-            model='whisper-large-v3',
-            file=f,
-            language='vi',
-            prompt=WHISPER_PROMPT,
-            response_format='text'
-        )
-    return result if isinstance(result, str) else result.text
+    for attempt in range(5):
+        try:
+            with open(audio_path, 'rb') as f:
+                result = client.audio.transcriptions.create(
+                    model='whisper-large-v3',
+                    file=f,
+                    language='vi',
+                    prompt=WHISPER_PROMPT,
+                    response_format='text'
+                )
+            return result if isinstance(result, str) else result.text
+        except groq_lib.RateLimitError as e:
+            wait = 90 if attempt < 3 else 180
+            print(f"  ⏳ Groq rate limit, chờ {wait}s (lần {attempt+1}/5)...")
+            time.sleep(wait)
+    raise Exception("Groq Whisper rate limit vượt quá 5 lần retry")
 
 
 def run():
