@@ -3,6 +3,11 @@ name: Finalize Minutes
 on:
   repository_dispatch:
     types: [send_minutes_final]
+  workflow_dispatch:
+    inputs:
+      meeting_id:
+        description: 'Meeting ID để gửi biên bản'
+        required: true
 
 jobs:
   run:
@@ -19,7 +24,7 @@ jobs:
 
       - name: Finalize & send minutes
         env:
-          MEETING_ID:         ${{ github.event.client_payload.meeting_id }}
+          MEETING_ID:         ${{ github.event.client_payload.meeting_id || inputs.meeting_id }}
           ANTHROPIC_API_KEY:  ${{ secrets.ANTHROPIC_API_KEY }}
           GROQ_API_KEY:       ${{ secrets.GROQ_API_KEY }}
           GMAIL_ADDRESS:      ${{ secrets.GMAIL_ADDRESS }}
