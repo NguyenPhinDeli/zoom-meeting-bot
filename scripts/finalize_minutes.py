@@ -29,10 +29,11 @@ def send_doc_link(topic: str, meeting_date: str, doc_url: str,
     ]
     my_tasks_html = ''
     if my_tasks:
-        rows = ''.join(
-            f'<li>{"🔴 Làm ngay" if item.get("type")=="immediate" else f"📅 {item.get(\"deadline\",\"?\")}"}  — {item.get("viec") or item.get("task","")}</li>'
-            for item in my_tasks
-        )
+        def _task_row(item):
+            dl = '🔴 Làm ngay' if item.get('type') == 'immediate' else f'📅 {item.get("deadline","?")}'
+            task = item.get('viec') or item.get('task', '')
+            return f'<li>{dl} — {task}</li>'
+        rows = ''.join(_task_row(item) for item in my_tasks)
         my_tasks_html = f"""
 <div style="background:#fff8e1;border-left:4px solid #f39c12;padding:12px 16px;margin:16px 0;border-radius:4px">
   <strong>⚠️ Việc được giao cho bạn:</strong>
