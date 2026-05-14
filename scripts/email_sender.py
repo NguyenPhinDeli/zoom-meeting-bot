@@ -124,12 +124,17 @@ def _build_html(meeting_title: str, meeting_date: str, recipient_name: str,
                 recipient_email: str, is_ceo: bool) -> str:
 
     tti      = analysis.get('thong_tin_chung', {})
+    if not isinstance(tti, dict): tti = {}
     items    = analysis.get('action_items', [])
+    if not isinstance(items, list): items = []
     quyet    = analysis.get('quyet_dinh', {})
+    if isinstance(quyet, list): quyet = {'da_thong_nhat': quyet, 'chua_giai_quyet': []}
+    if not isinstance(quyet, dict): quyet = {}
     thao_luan = analysis.get('noi_dung_thao_luan', [])
-    muc_tieu = analysis.get('muc_tieu', '')
-    hop_sau  = analysis.get('hop_tiep_theo', 'Chưa xác định')
-    ceo_sum  = analysis.get('summary_ceo', '')
+    if not isinstance(thao_luan, list): thao_luan = []
+    muc_tieu = analysis.get('muc_tieu', '') or ''
+    hop_sau  = analysis.get('hop_tiep_theo', 'Chưa xác định') or 'Chưa xác định'
+    ceo_sum  = analysis.get('summary_ceo', '') or ''
 
     # ── 1. Thông tin chung ─────────────────────────────────────────────────
     chu_tri   = tti.get('chu_tri', 'Không rõ')
