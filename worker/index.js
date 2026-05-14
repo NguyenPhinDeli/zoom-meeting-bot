@@ -217,10 +217,29 @@ async function handleZoom(request, env) {
     const stored     = await env.MEETINGS_KV.get(`meeting:${meetingId}`);
     const info       = stored ? JSON.parse(stored) : null;
 
-    // Lấy audio URL trực tiếp từ webhook payload — tránh phải gọi API riêng
+    // Lấy audio URL trực tiếp từ webhook payload
     const recFiles = meetingObj.recording_files || [];
     const audioRec = recFiles.find(f => f.file_type === 'M4A')
                   || recFiles.find(f => f.file_type === 'MP4');
+
+    // Fetch danh sách người tham dự thật từ Zoom Report API
+    let emails = info?.emails || [];
+    try {
+      const zoomToken = await getZoomToken(env);
+      const pRes = await fetch(
+        `https://api.zoom.us/v2/report/meetings/${meetingId}/participants?page_size=100`,
+        { headers: { 'Authorization': `Bearer ${zoomToken}` } }
+      );
+      if (pRes.ok) {
+        const pData = await pRes.json();
+        const fetched = (pData.participants || [])
+          .map(p => p.user_email)
+          .filter(e => e && e.includes('@'));
+        if (fetched.length > 0) emails = [...new Set(fetched)];
+      }
+    } catch (e) {
+      // fallback: dùng emails từ KV
+    }
 
     await triggerGitHubActions(env, 'process_recording', {
       meeting_id   : meetingId,
@@ -228,7 +247,7 @@ async function handleZoom(request, env) {
       topic        : meetingObj.topic || info?.title || '',
       start_time   : meetingObj.start_time || info?.start_time || '',
       duration     : meetingObj.duration || info?.duration || 0,
-      emails       : info?.emails || [],
+      emails,
       host_email   : meetingObj.host_email || '',
       audio_url    : audioRec?.download_url || '',
       audio_type   : (audioRec?.file_type || '').toLowerCase()
