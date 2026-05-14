@@ -150,7 +150,7 @@ def run():
     # ── 6. Lưu draft vào Sheets + notify CEO qua Telegram ─────────────────
     print("\n[5/5] Lưu draft + notify Telegram...")
     save_draft(meeting_id, topic, start_time, host_email,
-               emails, participants, doc_id, doc_url)
+               emails, participants, doc_id, doc_url, analysis=analysis)
     notify_draft_ready(topic, meeting_date, meeting_id, doc_url, len(action_items))
 
     print("\n== PHASE 1 HOÀN THÀNH — Chờ CEO duyệt ==")

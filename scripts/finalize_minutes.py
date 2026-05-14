@@ -39,20 +39,24 @@ def run():
     print(f"  Doc: {doc_url}")
     print(f"  Participants: {[p['email'] for p in participants]}")
 
-    # 2. Đọc Google Doc (đã được CEO chỉnh sửa)
-    print("\n[1/4] Đọc Google Doc...")
-    doc_text = read_doc_as_text(doc_id)
-    print(f"  ✓ Doc text: {len(doc_text)} ký tự")
-
-    # 3. Re-analyze từ doc text
-    print("\n[2/4] Re-analyze với Claude...")
-    analysis = reanalyze_from_doc(doc_text, topic, participants, host_email)
-    if not analysis:
-        notify_owner(f"⚠️ Re-analyze thất bại cho meeting {meeting_id}")
-        return 1
-    action_items = analysis.get('action_items', [])
-    keywords     = analysis.get('keywords', [])
-    print(f"  ✓ {len(action_items)} action items, {len(keywords)} keywords")
+    # 2. Lấy analysis: ưu tiên dùng bản đã lưu, fallback re-analyze từ Google Doc
+    analysis = draft.get('analysis')
+    if analysis:
+        print("\n[1/4] Dùng analysis đã lưu từ Phase 1...")
+        action_items = analysis.get('action_items', [])
+        keywords     = analysis.get('keywords', [])
+        print(f"  ✓ {len(action_items)} action items, {len(keywords)} keywords")
+    else:
+        print("\n[1/4] Đọc Google Doc + Re-analyze...")
+        doc_text = read_doc_as_text(doc_id)
+        print(f"  ✓ Doc text: {len(doc_text)} ký tự")
+        analysis = reanalyze_from_doc(doc_text, topic, participants, host_email)
+        if not analysis:
+            notify_owner(f"⚠️ Re-analyze thất bại cho meeting {meeting_id}")
+            return 1
+        action_items = analysis.get('action_items', [])
+        keywords     = analysis.get('keywords', [])
+        print(f"  ✓ {len(action_items)} action items, {len(keywords)} keywords")
 
     # 4. Gửi email cho cả team
     print("\n[3/4] Gửi email biên bản cho team...")
