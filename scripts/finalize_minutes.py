@@ -1,15 +1,86 @@
 """
-Phase 2: CEO đã duyệt → đọc Google Doc → gửi email team + log Sheets + notify.
+Phase 2: CEO đã duyệt → gửi link Google Doc cho team + log Sheets + notify.
 Triggered bởi GH Actions khi nhận /send_all từ Telegram.
 """
 
-import os, sys, traceback
+import os, sys, traceback, smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 from sheets_manager  import get_draft, log_meeting, log_action_items, mark_draft_sent
-from gdoc_manager    import read_doc_as_text
-from analyze         import reanalyze_from_doc
-from email_sender    import send_all_minutes
 from telegram_notify import notify_meeting_done, notify_owner
+
+SMTP_HOST = 'smtp.gmail.com'
+SMTP_PORT = 587
+SMTP_USER = os.environ.get('GMAIL_ADDRESS', '')
+SMTP_PASS = os.environ.get('GMAIL_APP_PASSWORD', '')
+
+
+def send_doc_link(topic: str, meeting_date: str, doc_url: str,
+                  participant: dict, action_items: list):
+    """Gửi email đơn giản: link Google Doc biên bản."""
+    email = participant['email']
+    name  = participant.get('name', email)
+
+    # Lọc task của người này
+    my_tasks = [
+        item for item in action_items
+        if (item.get('pic_email') or item.get('assignee_email', '')).lower() == email.lower()
+    ]
+    my_tasks_html = ''
+    if my_tasks:
+        rows = ''.join(
+            f'<li>{"🔴 Làm ngay" if item.get("type")=="immediate" else f"📅 {item.get(\"deadline\",\"?\")}"}  — {item.get("viec") or item.get("task","")}</li>'
+            for item in my_tasks
+        )
+        my_tasks_html = f"""
+<div style="background:#fff8e1;border-left:4px solid #f39c12;padding:12px 16px;margin:16px 0;border-radius:4px">
+  <strong>⚠️ Việc được giao cho bạn:</strong>
+  <ul style="margin:6px 0 0;padding-left:18px">{rows}</ul>
+</div>"""
+
+    html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+<body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333;font-size:14px">
+  <div style="background:#1a73e8;color:white;padding:20px 24px;border-radius:8px 8px 0 0">
+    <h1 style="margin:0;font-size:20px">📋 Biên Bản Cuộc Họp</h1>
+    <p style="margin:4px 0 0;opacity:.85">{topic} · {meeting_date}</p>
+  </div>
+  <div style="padding:20px 24px;border:1px solid #ddd;border-top:none;border-radius:0 0 8px 8px">
+    <p>Kính gửi <strong>{name}</strong>,</p>
+    <p>Biên bản cuộc họp <strong>{topic}</strong> ngày {meeting_date} đã sẵn sàng.</p>
+    <div style="text-align:center;margin:24px 0">
+      <a href="{doc_url}"
+         style="background:#1a73e8;color:white;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px">
+        📄 Xem Biên Bản
+      </a>
+    </div>
+    {my_tasks_html}
+    <hr style="margin-top:24px;border:none;border-top:1px solid #eee">
+    <p style="color:#aaa;font-size:12px;margin-bottom:0">
+      Email tự động từ IDS Meeting Bot · nguyenpd@ids-international.vn
+    </p>
+  </div>
+</body></html>"""
+
+    msg = MIMEMultipart('alternative')
+    msg['From']    = f'"IDS Meeting Bot" <{SMTP_USER}>'
+    msg['To']      = email
+    msg['Subject'] = f'[Biên Bản] {topic} · {meeting_date}'
+    msg.attach(MIMEText(html, 'html', 'utf-8'))
+
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as s:
+            s.ehlo(); s.starttls(); s.ehlo()
+            s.login(SMTP_USER, SMTP_PASS)
+            s.send_message(msg)
+        print(f"  ✓ Gửi → {email}")
+    except Exception as e:
+        import ssl
+        ctx = ssl.create_default_context()
+        with smtplib.SMTP_SSL(SMTP_HOST, 465, context=ctx, timeout=20) as s:
+            s.login(SMTP_USER, SMTP_PASS)
+            s.send_message(msg)
+        print(f"  ✓ Gửi (SSL) → {email}")
 
 
 def run():
@@ -18,9 +89,8 @@ def run():
         print("❌ Thiếu MEETING_ID")
         return 1
 
-    print(f"== Phase 2: Finalize biên bản meeting {meeting_id} ==")
+    print(f"== Phase 2: Gửi biên bản meeting {meeting_id} ==")
 
-    # 1. Lấy draft info từ Sheets
     draft = get_draft(meeting_id)
     if not draft:
         notify_owner(f"⚠️ Không tìm thấy draft cho meeting {meeting_id}")
@@ -28,50 +98,33 @@ def run():
 
     topic        = draft['topic']
     start_time   = draft['start_time']
-    host_email   = draft['host_email']
-    emails       = draft['emails']
     participants = draft['participants']
-    doc_id       = draft['doc_id']
     doc_url      = draft['doc_url']
     meeting_date = start_time[:10] if start_time else 'N/A'
+    analysis     = draft.get('analysis') or {}
+    action_items = analysis.get('action_items', [])
+    keywords     = analysis.get('keywords', [])
 
-    print(f"  Meeting: {topic}")
-    print(f"  Doc: {doc_url}")
-    print(f"  Participants: {[p['email'] for p in participants]}")
+    print(f"  Meeting : {topic}")
+    print(f"  Doc     : {doc_url}")
+    print(f"  Gửi cho : {[p['email'] for p in participants]}")
 
-    # 2. Lấy analysis: ưu tiên dùng bản đã lưu, fallback re-analyze từ Google Doc
-    analysis = draft.get('analysis')
-    if analysis:
-        print("\n[1/4] Dùng analysis đã lưu từ Phase 1...")
-        action_items = analysis.get('action_items', [])
-        keywords     = analysis.get('keywords', [])
-        print(f"  ✓ {len(action_items)} action items, {len(keywords)} keywords")
-    else:
-        print("\n[1/4] Đọc Google Doc + Re-analyze...")
-        doc_text = read_doc_as_text(doc_id)
-        print(f"  ✓ Doc text: {len(doc_text)} ký tự")
-        analysis = reanalyze_from_doc(doc_text, topic, participants, host_email)
-        if not analysis:
-            notify_owner(f"⚠️ Re-analyze thất bại cho meeting {meeting_id}")
-            return 1
-        action_items = analysis.get('action_items', [])
-        keywords     = analysis.get('keywords', [])
-        print(f"  ✓ {len(action_items)} action items, {len(keywords)} keywords")
+    # Gửi email link Google Doc
+    print("\n[1/3] Gửi email link Google Doc...")
+    for p in participants:
+        try:
+            send_doc_link(topic, meeting_date, doc_url, p, action_items)
+        except Exception as e:
+            print(f"  ❌ Lỗi → {p['email']}: {e}")
 
-    # 4. Gửi email cho cả team
-    print("\n[3/4] Gửi email biên bản cho team...")
-    if participants:
-        send_all_minutes(topic, meeting_date, participants, analysis)
-    else:
-        print("  ⚠️ Không có participants")
-
-    # 5. Log vào Sheets + mark draft sent
-    print("\n[4/4] Ghi Sheets...")
+    # Log Sheets
+    print("\n[2/3] Ghi Sheets...")
     log_meeting(meeting_id, topic, start_time, participants, keywords)
     log_action_items(meeting_id, action_items)
     mark_draft_sent(meeting_id)
 
-    # 6. Notify hoàn tất
+    # Notify
+    print("\n[3/3] Notify Telegram...")
     notify_meeting_done(topic, meeting_date, len(action_items), participants)
 
     print("\n== PHASE 2 HOÀN THÀNH ==")
@@ -85,7 +138,7 @@ if __name__ == '__main__':
         err = traceback.format_exc()
         print(f"❌ Finalize lỗi:\n{err}", file=sys.stderr)
         try:
-            notify_owner(f"❌ Finalize pipeline lỗi:\n{err[-800:]}")
+            notify_owner(f"❌ Finalize lỗi:\n{err[-800:]}")
         except Exception:
             pass
         sys.exit(1)
