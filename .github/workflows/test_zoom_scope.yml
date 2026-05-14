@@ -1,0 +1,44 @@
+name: Test Zoom Report Scope
+
+on:
+  workflow_dispatch:
+    inputs:
+      meeting_id:
+        description: 'Meeting ID để test'
+        required: true
+        default: '83481415402'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Test Zoom Report API scope
+        env:
+          ZOOM_ACCOUNT_ID:    ${{ secrets.ZOOM_ACCOUNT_ID }}
+          ZOOM_CLIENT_ID:     ${{ secrets.ZOOM_CLIENT_ID }}
+          ZOOM_CLIENT_SECRET: ${{ secrets.ZOOM_CLIENT_SECRET }}
+        run: |
+          python3 - <<'EOF'
+          import os, base64, requests
+
+          # Lấy token
+          creds = base64.b64encode(f"{os.environ['ZOOM_CLIENT_ID']}:{os.environ['ZOOM_CLIENT_SECRET']}".encode()).decode()
+          r = requests.post(
+              f"https://zoom.us/oauth/token?grant_type=account_credentials&account_id={os.environ['ZOOM_ACCOUNT_ID']}",
+              headers={'Authorization': f'Basic {creds}'}, timeout=15
+          )
+          token = r.json().get('access_token', '')
+          print(f"Token: {'OK' if token else 'FAIL'}")
+
+          # Test Report API
+          meeting_id = os.environ.get('MEETING_ID', '83481415402')
+          r2 = requests.get(
+              f"https://api.zoom.us/v2/report/meetings/{meeting_id}/participants",
+              headers={'Authorization': f'Bearer {token}'}, timeout=15
+          )
+          print(f"Report API status: {r2.status_code}")
+          print(f"Response: {r2.text[:500]}")
+          EOF
+        env:
+          MEETING_ID: ${{ inputs.meeting_id }}
