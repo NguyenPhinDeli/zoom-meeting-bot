@@ -210,7 +210,7 @@ def get_draft(meeting_id: str):
     result = sheets.spreadsheets().values().get(
         spreadsheetId=sid, range='Drafts!A2:J'
     ).execute()
-    for row in result.get('values', []):
+    for row in reversed(result.get('values', [])):
         if len(row) >= 9 and row[0] == str(meeting_id):
             analysis = None
             if len(row) >= 11 and row[10]:
