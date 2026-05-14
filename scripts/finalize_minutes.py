@@ -8,6 +8,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 from sheets_manager  import get_draft, log_meeting, log_action_items, mark_draft_sent
+from gdoc_manager    import read_doc_as_text
 from telegram_notify import notify_meeting_done, notify_owner
 
 SMTP_HOST = 'smtp.gmail.com'
@@ -16,13 +17,13 @@ SMTP_USER = os.environ.get('GMAIL_ADDRESS', '')
 SMTP_PASS = os.environ.get('GMAIL_APP_PASSWORD', '')
 
 
-def send_doc_link(topic: str, meeting_date: str, doc_url: str,
+def send_doc_link(topic: str, meeting_date: str, doc_url: str, doc_content: str,
                   participant: dict, action_items: list):
-    """Gửi email đơn giản: link Google Doc biên bản."""
+    """Gửi email: nội dung Google Doc + link gốc."""
     email = participant['email']
     name  = participant.get('name', email)
 
-    # Lọc task của người này
+    # Task của người này
     my_tasks = [
         item for item in action_items
         if (item.get('pic_email') or item.get('assignee_email', '')).lower() == email.lower()
@@ -40,23 +41,29 @@ def send_doc_link(topic: str, meeting_date: str, doc_url: str,
   <ul style="margin:6px 0 0;padding-left:18px">{rows}</ul>
 </div>"""
 
+    # Nội dung Google Doc → thay newline bằng <br>
+    doc_html = doc_content.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+    doc_html = '<br>'.join(doc_html.splitlines())
+
     html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"></head>
-<body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333;font-size:14px">
+<body style="font-family:Arial,sans-serif;max-width:680px;margin:0 auto;color:#333;font-size:14px">
   <div style="background:#1a73e8;color:white;padding:20px 24px;border-radius:8px 8px 0 0">
     <h1 style="margin:0;font-size:20px">📋 Biên Bản Cuộc Họp</h1>
     <p style="margin:4px 0 0;opacity:.85">{topic} · {meeting_date}</p>
   </div>
   <div style="padding:20px 24px;border:1px solid #ddd;border-top:none;border-radius:0 0 8px 8px">
     <p>Kính gửi <strong>{name}</strong>,</p>
-    <p>Biên bản cuộc họp <strong>{topic}</strong> ngày {meeting_date} đã sẵn sàng.</p>
-    <div style="text-align:center;margin:24px 0">
+    {my_tasks_html}
+    <div style="background:#f9f9f9;border:1px solid #e0e0e0;border-radius:6px;padding:16px 20px;margin:16px 0;line-height:1.7">
+      {doc_html}
+    </div>
+    <div style="text-align:center;margin:20px 0">
       <a href="{doc_url}"
-         style="background:#1a73e8;color:white;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px">
-        📄 Xem Biên Bản
+         style="background:#1a73e8;color:white;padding:10px 24px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:14px">
+        📄 Mở Google Doc gốc
       </a>
     </div>
-    {my_tasks_html}
-    <hr style="margin-top:24px;border:none;border-top:1px solid #eee">
+    <hr style="border:none;border-top:1px solid #eee">
     <p style="color:#aaa;font-size:12px;margin-bottom:0">
       Email tự động từ IDS Meeting Bot · nguyenpd@ids-international.vn
     </p>
@@ -110,23 +117,29 @@ def run():
     print(f"  Doc     : {doc_url}")
     print(f"  Gửi cho : {[p['email'] for p in participants]}")
 
-    # Gửi email link Google Doc
-    print("\n[1/3] Gửi email link Google Doc...")
+    # Đọc nội dung Google Doc
+    print("\n[1/3] Đọc nội dung Google Doc...")
+    doc_id      = draft['doc_id']
+    doc_content = read_doc_as_text(doc_id)
+    print(f"  ✓ {len(doc_content)} ký tự")
+
+    # Gửi email
+    print("\n[2/3] Gửi email...")
     for p in participants:
         try:
-            send_doc_link(topic, meeting_date, doc_url, p, action_items)
+            send_doc_link(topic, meeting_date, doc_url, doc_content, p, action_items)
         except Exception as e:
             print(f"  ❌ Lỗi → {p['email']}: {e}")
 
     # Log Sheets
-    print("\n[2/3] Ghi Sheets...")
+    print("\n[3/3] Ghi Sheets + Notify...")
     log_meeting(meeting_id, topic, start_time, participants, keywords)
     log_action_items(meeting_id, action_items)
     mark_draft_sent(meeting_id)
-
-    # Notify
-    print("\n[3/3] Notify Telegram...")
-    notify_meeting_done(topic, meeting_date, len(action_items), participants)
+    try:
+        notify_meeting_done(topic, meeting_date, len(action_items), participants)
+    except Exception:
+        pass
 
     print("\n== PHASE 2 HOÀN THÀNH ==")
     return 0
