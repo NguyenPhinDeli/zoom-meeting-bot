@@ -83,48 +83,54 @@ def run():
     # ── 2. Lấy audio → Whisper transcript ────────────────────────────────
     print("\n[1/5] Tải audio từ Zoom + transcribe bằng Groq Whisper...")
 
-    # Mock transcript cho testing
+    # Ưu tiên: MOCK_TRANSCRIPT → transcript đã lưu trong Sheets → Whisper
     mock_transcript = os.environ.get('MOCK_TRANSCRIPT', '').strip()
+
+    # Check xem meeting này đã có transcript lưu chưa
+    from sheets_manager import get_draft as _get_draft
+    _existing = _get_draft(meeting_id)
+    saved_transcript = (_existing or {}).get('transcript', '').strip() if _existing else ''
+
     if mock_transcript:
         print("  ℹ️ Dùng MOCK_TRANSCRIPT để test")
         transcript_text = mock_transcript
-        # Skip audio download
         print(f"  ✓ Transcript (mock): {len(transcript_text)} ký tự")
-
-    if mock_transcript:
-        pass  # đã set transcript_text ở trên, skip audio
+    elif saved_transcript:
+        print("  ℹ️ Dùng transcript đã lưu từ lần chạy trước (bỏ qua Whisper)")
+        transcript_text = saved_transcript
+        print(f"  ✓ Transcript (cached): {len(transcript_text)} ký tự")
     else:
-      # Ưu tiên URL từ webhook payload (nhanh, không cần API call)
-      audio_url  = os.environ.get('AUDIO_URL', '').strip()
-      audio_type = os.environ.get('AUDIO_TYPE', 'm4a').strip() or 'm4a'
+        # Ưu tiên URL từ webhook payload
+        audio_url  = os.environ.get('AUDIO_URL', '').strip()
+        audio_type = os.environ.get('AUDIO_TYPE', 'm4a').strip() or 'm4a'
 
-    # Fallback: gọi Zoom API nếu không có URL từ webhook
-    if not mock_transcript and not audio_url:
-        print("  ℹ️ Không có audio_url từ webhook, thử lấy qua API...")
-        recordings = get_recordings(meeting_uuid, meeting_id=meeting_id)
-        files = recordings.get('recording_files', [])
-        audio_rec = (
-            next((f for f in files if f.get('file_type') == 'M4A'), None) or
-            next((f for f in files if f.get('file_type') == 'MP4'), None)
-        )
-        if audio_rec:
-            audio_url  = audio_rec['download_url']
-            audio_type = audio_rec['file_type'].lower()
+        # Fallback: gọi Zoom API nếu không có URL từ webhook
+        if not audio_url:
+            print("  ℹ️ Không có audio_url từ webhook, thử lấy qua API...")
+            recordings = get_recordings(meeting_uuid, meeting_id=meeting_id)
+            files = recordings.get('recording_files', [])
+            audio_rec = (
+                next((f for f in files if f.get('file_type') == 'M4A'), None) or
+                next((f for f in files if f.get('file_type') == 'MP4'), None)
+            )
+            if audio_rec:
+                audio_url  = audio_rec['download_url']
+                audio_type = audio_rec['file_type'].lower()
 
-    if not mock_transcript and not audio_url:
-        notify_owner(f"⚠️ Cuộc họp <b>{topic}</b>: không lấy được recording.\nKiểm tra Zoom cloud recording đã bật chưa.")
-        transcript_text = "(Không có audio recording)"
-    elif not mock_transcript:
-        with tempfile.NamedTemporaryFile(suffix=f'.{audio_type}', delete=False) as tmp:
-            tmp_path = tmp.name
-        try:
-            download_audio_file(audio_url, tmp_path)
-            transcript_text = transcribe_with_whisper(tmp_path)
-            print(f"  ✓ Transcript (Whisper): {len(transcript_text)} ký tự")
-        finally:
-            for p in [tmp_path, tmp_path.rsplit('.', 1)[0] + '_compressed.mp3']:
-                try: os.unlink(p)
-                except FileNotFoundError: pass
+        if not audio_url:
+            notify_owner(f"⚠️ Cuộc họp <b>{topic}</b>: không lấy được recording.\nKiểm tra Zoom cloud recording đã bật chưa.")
+            transcript_text = "(Không có audio recording)"
+        else:
+            with tempfile.NamedTemporaryFile(suffix=f'.{audio_type}', delete=False) as tmp:
+                tmp_path = tmp.name
+            try:
+                download_audio_file(audio_url, tmp_path)
+                transcript_text = transcribe_with_whisper(tmp_path)
+                print(f"  ✓ Transcript (Whisper): {len(transcript_text)} ký tự")
+            finally:
+                for p in [tmp_path, tmp_path.rsplit('.', 1)[0] + '_compressed.mp3']:
+                    try: os.unlink(p)
+                    except FileNotFoundError: pass
 
     # ── 3. Lấy thông tin participants + full team từ Sheets ───────────────
     print("\n[2/5] Lấy thông tin team từ Google Sheets...")
@@ -151,7 +157,8 @@ def run():
     # ── 6. Lưu draft vào Sheets + notify CEO qua Telegram ─────────────────
     print("\n[5/5] Lưu draft + notify Telegram...")
     save_draft(meeting_id, topic, start_time, host_email,
-               emails, participants, doc_id, doc_url, analysis=analysis)
+               emails, participants, doc_id, doc_url,
+               analysis=analysis, transcript=transcript_text)
     notify_draft_ready(topic, meeting_date, meeting_id, doc_url, len(action_items))
 
     print("\n== PHASE 1 HOÀN THÀNH — Chờ CEO duyệt ==")

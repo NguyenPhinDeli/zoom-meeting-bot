@@ -179,14 +179,14 @@ def log_action_items(meeting_id: str, action_items: list[dict]):
 
 def save_draft(meeting_id: str, topic: str, start_time: str, host_email: str,
                emails: list, participants: list, doc_id: str, doc_url: str,
-               analysis: dict = None):
-    """Lưu draft biên bản vào tab Drafts (cột K: analysis JSON)."""
+               analysis: dict = None, transcript: str = ''):
+    """Lưu draft biên bản vào tab Drafts (K: analysis JSON, L: transcript)."""
     import json as _json
     sheets = _sheets_service()
     sid    = get_or_create_spreadsheet()
     sheets.spreadsheets().values().append(
         spreadsheetId=sid,
-        range='Drafts!A:K',
+        range='Drafts!A:L',
         valueInputOption='RAW',
         insertDataOption='INSERT_ROWS',
         body={'values': [[
@@ -195,7 +195,8 @@ def save_draft(meeting_id: str, topic: str, start_time: str, host_email: str,
             _json.dumps(participants, ensure_ascii=False),
             doc_id, doc_url, 'pending',
             datetime.now().isoformat(),
-            _json.dumps(analysis, ensure_ascii=False) if analysis else ''
+            _json.dumps(analysis, ensure_ascii=False) if analysis else '',
+            transcript
         ]]}
     ).execute()
     print(f"  ✓ Draft lưu vào Sheets: {doc_url}")
@@ -215,6 +216,7 @@ def get_draft(meeting_id: str):
             if len(row) >= 11 and row[10]:
                 try: analysis = _json.loads(row[10])
                 except Exception: pass
+            transcript = row[11] if len(row) >= 12 else ''
             return {
                 'meeting_id'  : row[0],
                 'topic'       : row[1],
@@ -226,6 +228,7 @@ def get_draft(meeting_id: str):
                 'doc_url'     : row[7],
                 'status'      : row[8],
                 'analysis'    : analysis,
+                'transcript'  : transcript,
             }
     return None
 
