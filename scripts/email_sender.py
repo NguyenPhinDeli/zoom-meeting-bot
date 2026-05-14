@@ -159,7 +159,9 @@ def _build_html(meeting_title: str, meeting_date: str, recipient_name: str,
     # ── 3. Nội dung thảo luận ──────────────────────────────────────────────
     if thao_luan:
         items_html = ''.join(
-            f'<div style="margin-bottom:10px"><strong>🔹 {t["van_de"]}</strong><br>{t["noi_dung"]}</div>'
+            f'<div style="margin-bottom:10px"><strong>🔹 {t.get("van_de", t.get("topic", ""))}</strong><br>{t.get("noi_dung", t.get("content", ""))}</div>'
+            if isinstance(t, dict) else
+            f'<div style="margin-bottom:10px">🔹 {t}</div>'
             for t in thao_luan
         )
     else:
