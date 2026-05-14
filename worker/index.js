@@ -222,24 +222,8 @@ async function handleZoom(request, env) {
     const audioRec = recFiles.find(f => f.file_type === 'M4A')
                   || recFiles.find(f => f.file_type === 'MP4');
 
-    // Fetch danh sách người tham dự thật từ Zoom Report API
-    let emails = info?.emails || [];
-    try {
-      const zoomToken = await getZoomToken(env);
-      const pRes = await fetch(
-        `https://api.zoom.us/v2/report/meetings/${meetingId}/participants?page_size=100`,
-        { headers: { 'Authorization': `Bearer ${zoomToken}` } }
-      );
-      if (pRes.ok) {
-        const pData = await pRes.json();
-        const fetched = (pData.participants || [])
-          .map(p => p.user_email)
-          .filter(e => e && e.includes('@'));
-        if (fetched.length > 0) emails = [...new Set(fetched)];
-      }
-    } catch (e) {
-      // fallback: dùng emails từ KV
-    }
+    // Participants = danh sách đã mời khi tạo meeting (lưu trong KV)
+    const emails = info?.emails || [];
 
     await triggerGitHubActions(env, 'process_recording', {
       meeting_id   : meetingId,
