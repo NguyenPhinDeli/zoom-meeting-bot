@@ -37,23 +37,18 @@ def transcribe_with_whisper(audio_path: str) -> str:
     import groq as groq_lib
     client     = Groq(api_key=os.environ['GROQ_API_KEY'])
     audio_path = compress_audio_if_needed(audio_path)
-    for attempt in range(2):
-        try:
-            with open(audio_path, 'rb') as f:
-                result = client.audio.transcriptions.create(
-                    model='whisper-large-v3',
-                    file=f,
-                    language='vi',
-                    prompt=WHISPER_PROMPT,
-                    response_format='text'
-                )
-            return result if isinstance(result, str) else result.text
-        except groq_lib.RateLimitError as e:
-            if attempt == 0:
-                print(f"  ⏳ Groq rate limit, chờ 10 phút rồi thử lại...")
-                time.sleep(600)
-            else:
-                raise Exception("Groq Whisper rate limit — quota hết, thử lại sau 1 giờ")
+    try:
+        with open(audio_path, 'rb') as f:
+            result = client.audio.transcriptions.create(
+                model='whisper-large-v3-turbo',
+                file=f,
+                language='vi',
+                prompt=WHISPER_PROMPT,
+                response_format='text'
+            )
+        return result if isinstance(result, str) else result.text
+    except groq_lib.RateLimitError:
+        raise Exception("GROQ_RATE_LIMIT")
 
 
 def run():
@@ -144,7 +139,18 @@ def run():
                         download_audio_file(audio_url, tmp_path)
                     else:
                         raise
-                transcript_text = transcribe_with_whisper(tmp_path)
+                try:
+                    transcript_text = transcribe_with_whisper(tmp_path)
+                except Exception as e:
+                    if 'GROQ_RATE_LIMIT' in str(e):
+                        notify_owner(
+                            f"⏳ <b>{topic}</b>: Groq quota hết.\n"
+                            f"Chờ 1 giờ rồi trigger lại:\n"
+                            f"Meeting ID: <code>{meeting_id}</code>"
+                        )
+                        print("  ⚠️ Groq rate limit — đã notify Telegram, dừng pipeline.")
+                        return 0
+                    raise
                 print(f"  ✓ Transcript (Whisper): {len(transcript_text)} ký tự")
             finally:
                 for p in [tmp_path, tmp_path.rsplit('.', 1)[0] + '_compressed.mp3']:
