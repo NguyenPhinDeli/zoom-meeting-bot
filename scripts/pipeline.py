@@ -37,7 +37,7 @@ def transcribe_with_whisper(audio_path: str) -> str:
     import groq as groq_lib
     client     = Groq(api_key=os.environ['GROQ_API_KEY'])
     audio_path = compress_audio_if_needed(audio_path)
-    for attempt in range(5):
+    for attempt in range(2):
         try:
             with open(audio_path, 'rb') as f:
                 result = client.audio.transcriptions.create(
@@ -49,10 +49,11 @@ def transcribe_with_whisper(audio_path: str) -> str:
                 )
             return result if isinstance(result, str) else result.text
         except groq_lib.RateLimitError as e:
-            wait = 90 if attempt < 3 else 180
-            print(f"  ⏳ Groq rate limit, chờ {wait}s (lần {attempt+1}/5)...")
-            time.sleep(wait)
-    raise Exception("Groq Whisper rate limit vượt quá 5 lần retry")
+            if attempt == 0:
+                print(f"  ⏳ Groq rate limit, chờ 10 phút rồi thử lại...")
+                time.sleep(600)
+            else:
+                raise Exception("Groq Whisper rate limit — quota hết, thử lại sau 1 giờ")
 
 
 def run():
