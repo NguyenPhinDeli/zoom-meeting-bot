@@ -124,7 +124,25 @@ def run():
             with tempfile.NamedTemporaryFile(suffix=f'.{audio_type}', delete=False) as tmp:
                 tmp_path = tmp.name
             try:
-                download_audio_file(audio_url, tmp_path)
+                try:
+                    download_audio_file(audio_url, tmp_path)
+                except Exception as e:
+                    if '401' in str(e):
+                        # Token webhook hết hạn → lấy URL mới từ Zoom API
+                        print("  ⚠️ URL webhook hết hạn (401), lấy URL mới từ Zoom API...")
+                        recordings = get_recordings(meeting_uuid, meeting_id=meeting_id)
+                        files = recordings.get('recording_files', [])
+                        audio_rec = (
+                            next((f for f in files if f.get('file_type') == 'M4A'), None) or
+                            next((f for f in files if f.get('file_type') == 'MP4'), None)
+                        )
+                        if not audio_rec:
+                            raise Exception("Không lấy được recording URL mới từ Zoom API")
+                        audio_url  = audio_rec['download_url']
+                        audio_type = audio_rec['file_type'].lower()
+                        download_audio_file(audio_url, tmp_path)
+                    else:
+                        raise
                 transcript_text = transcribe_with_whisper(tmp_path)
                 print(f"  ✓ Transcript (Whisper): {len(transcript_text)} ký tự")
             finally:
